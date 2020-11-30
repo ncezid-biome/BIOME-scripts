@@ -37,29 +37,34 @@ qsub -N Shovill -q all.q -o $TMP/log -j y -pe smp $SLOTS_PER_JOB -V -cwd -t 1-$(
   #!/bin/bash -l
   set -e
   source /etc/profile.d/modules.sh
+  module load bwa/0.7.17 flash kmc lighter
+  module load megahit pilon Skesa/2.3.0 SPAdes/3.14.0
+  module load trimmomatic velvet/1.2.10 seqtk/1.3
 
   which shovill
 
   # Set up filenames
-  STRAIN=$(sed -n ${SGE_TASK_ID}p $CTRL_FILE | awk -F',' {print $3}')
-  MINCOV=$(sed -n ${SGE_TASK_ID}p $CTRL_FILE | awk -F',' {print $4}')
-  READ1=$(sed -n ${SGE_TASK_ID}p $CTRL_FILE | awk -F',' {print $1}')
-  READ2=$(sed -n ${SGE_TASK_ID}p $CTRL_FILE | awk -F',' {print $2}')
+  STRAIN=$(sed -n ${SGE_TASK_ID}p $CTRL_FILE | awk -F',' '{print $3}')
+  MINCOV=$(sed -n ${SGE_TASK_ID}p $CTRL_FILE | awk -F',' '{print $4}')
+  READ1=$(sed -n ${SGE_TASK_ID}p $CTRL_FILE | awk -F',' '{print $1}')
+  READ2=$(sed -n ${SGE_TASK_ID}p $CTRL_FILE | awk -F',' '{print $2}')
   tmpdir=/scratch/$USER
   mkdir -p $tmpdir
   outdir=$(mktemp --tmpdir=$tmpdir --directory Shovill.XXXXXX);
   trap "rm -rf $outdir" EXIT
 
-  echo "shovill will be run on $STRAIN with minimum coverage of $MINCOV under $(hostname)"
+  echo "Shovill will be run on $STRAIN with minimum coverage of $MINCOV under $(hostname)"
   echo "Working directory is $outdir"
 
-  echo shovill --outdir "$outdir"/shovill --R1 $READ1 --R2 $READ2 --mincov $MINCOV --trim --namefmt "$STRAIN"_contig%05d
-  exit 0  
+  shovill --outdir "$outdir"/shovill --R1 $READ1 --R2 $READ2 --mincov $MINCOV --trim --namefmt "$STRAIN"_contig%05d 
 
   #rename files to include strain name
   mv $outdir/shovill $PARENTDIR/$STRAIN
-  #mv $PARENTDIR/$STRAIN/contigs.fa $PARENTDIR/$STRAIN/$STRAIN.contigs.fa; mv $PARENTDIR/$STRAIN/contigs.gfa $PARENTDIR/$STRAIN/$STRAIN.contigs.gfa;
-  #mv $PARENTDIR/$STRAIN/shovill.corrections $PARENTDIR/$STRAIN/$STRAIN.shovill.corrections; mv $PARENTDIR/$STRAIN/shovill.log $PARENTDIR/$STRAIN/$STRAIN.shovill.log; mv $PARENTDIR/$STRAIN/spades.fasta $PARENTDIR/$STRAIN/$STRAIN.spades.fasta
+  mv $PARENTDIR/$STRAIN/contigs.fa $PARENTDIR/$STRAIN/$STRAIN.contigs.fa;
+  mv $PARENTDIR/$STRAIN/contigs.gfa $PARENTDIR/$STRAIN/$STRAIN.contigs.gfa;
+  mv $PARENTDIR/$STRAIN/shovill.corrections $PARENTDIR/$STRAIN/$STRAIN.shovill.corrections;
+  mv $PARENTDIR/$STRAIN/shovill.log $PARENTDIR/$STRAIN/$STRAIN.shovill.log;
+  mv $PARENTDIR/$STRAIN/spades.fasta $PARENTDIR/$STRAIN/$STRAIN.spades.fasta
   
   
 END_OF_SCRIPT
