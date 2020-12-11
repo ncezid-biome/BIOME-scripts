@@ -6,6 +6,8 @@
 # Output files will have the named prefix structure of STRAIN_ID.
 #-------------------------------------------------------------------------------------------------
 
+VERSION="0.2";
+
 # Read ARGV
 INPUT_CSV=$1
 SLOTS_PER_JOB=1 # manually change this as needed
