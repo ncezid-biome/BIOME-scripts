@@ -1,10 +1,10 @@
 #!/usr/bin/bash -l
 
 #-------------------------------------------------------------------------------------------------
-# This is a qsub array job script whichs assembles downloads a large batch of reads from SRA in
-# parallel using downloadSRA.py. The SRR IDs should be specified in a file; one ID per line. The
-# maximum number of threads and the number of threads per download will determine how many SRR IDs
-# are downloaded in parallel
+# This is a qsub array job script whichs downloads a large batch of reads from SRA in parallel
+# using downloadSRA.py. The SRR IDs should be specified in a file; one ID per line. The maximum
+# number of threads and the number of threads per download will determine how many SRR IDs are
+# downloaded in parallel and how many threads get assigned to each parallel process.
 #-------------------------------------------------------------------------------------------------
 
 
