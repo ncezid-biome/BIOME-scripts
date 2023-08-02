@@ -14,24 +14,32 @@ def __downloadOneRead(srr:str, outdir:str, numThreads:int) -> None:
         numThreads (int): the number of threads to use for this call
     """
     # constants
-   
     CMD_PREFIX = ('fasterq-dump', '--split-files', '--threads')
     CMD_SUFFIX = '--outdir'
-    GAP = " "*4
+    MAX_ATTEMPTS = 3
     EOL = "\n"
     FAIL_MSG_1 = 'failed to download reads for '
-    FAIL_MSG_2 = GAP + "Error message:  "
+    FAIL_MSG_2 = "    Error message:  "
     
     # build the command
     cmd = list(CMD_PREFIX)
     cmd.extend([str(numThreads), CMD_SUFFIX, outdir, srr])
 
-    # run the command
-    try:
-        subprocess.run(cmd, check=True, capture_output=True)
+    attempts = 0
+    while attempts < MAX_ATTEMPTS:
+        # run the command; exit loop if successful
+        try:
+            subprocess.run(cmd, check=True, capture_output=True)
+            failed = False
+            break
 
-    # print details if the run failed
-    except subprocess.CalledProcessError as e:
+        # try again if the run failed; mark it as a failure
+        except subprocess.CalledProcessError as e:
+            attempts += 1
+            failed = True
+
+    # print error if it failed
+    if failed:
         sys.stderr.write(FAIL_MSG_1 + srr + EOL)
         sys.stderr.write(FAIL_MSG_2 + str(e) + EOL*2)
 
