@@ -29,7 +29,7 @@ module load sratoolkit/2.11.3
 
 # call the program; may need to add it to your path or add a path to `downloadSRA.py`
 # $NSLOTS == number of threads assigned by the cluster
-# 8 threads per download was arbitrarily chosen; must be less than max_num_threads
+# 8 threads per download was arbitrarily chosen; must be less than $NSLOTS
 # ids.txt == text file with one SRR ID per line
 # out_dir == the directory where reads should be downloaded
-python3.11 downloadSRA.py --in ids.txt --max_num_threads $NSLOTS --threads_per_download 8 --dir out_dir
+python3.11 downloadSRA.py --in ids.txt --max_threads $NSLOTS --threads_per_download 8 --dir out_dir
