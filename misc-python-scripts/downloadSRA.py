@@ -1,3 +1,6 @@
+# Joseph S. Wirth
+# August 2023
+
 import getopt, glob, multiprocessing, os, subprocess, sys
 from io import TextIOWrapper
 
