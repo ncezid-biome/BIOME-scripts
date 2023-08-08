@@ -1,116 +1,108 @@
 # Joseph S. Wirth
 # May 2023
 
-import ftplib, glob, gzip, os, re, shutil, sys
+import ftplib, getopt, glob, gzip, os, re, shutil, sys
 from Bio import Entrez
 from Bio.Entrez import Parser
 
 
-def __parseArgs() -> tuple[str,list[str],str]:
-    """ parses command line arguments
+def __parseArgs() -> tuple[str,str,str,bool]:
+    """parses command line arguments
 
     Raises:
-        BaseException: improper syntax (wrong num arguments)
-        BaseException: email address not specified
-        ValueError: email address invalid
-        BaseException: email address not specified
-        BaseException: accession filename not specified
-        BaseException: accession filename not specified
-        BaseException: specified output dir flag without a value
-        ValueError: specified output directory is not a directory
+        ValueError: missing or invalid input file
+        ValueError: specified output is not a directory
+        ValueError: invalid email address
+        ValueError: missing one or more required arguments
 
     Returns:
-        tuple[str,list[str],str]: email address; list of accessions; outdir
+        tuple[str,str,str,bool]: email, in file, out directory, help requested?
     """
-    # constants
-    BASIC_ERR = "invalid usage. use -h flag for help."
-    EMAIL_FLAG = "-e"
-    EMAIL_ERR = "must specify valid email address"
-    INPUT_FLAG = "-i"
-    INPUT_ERR = "must specify valid filename containing accession numbers (one per line)"
-    OUTDIR_FLAG = "-o"
-    OUTDIR_ERR = "specified output is not a directory"
-
-    # check for the expected number of arguments
-    if len(sys.argv) not in [5,7]:
-        raise BaseException(BASIC_ERR)
-
-    # get the email address
-    if EMAIL_FLAG in sys.argv:
-        # should be one index beyond the flag
-        idx = sys.argv.index(EMAIL_FLAG)
-        try:
-            email = sys.argv[idx+1]
-        except:
-            raise BaseException(EMAIL_ERR)
+    # flags
+    IN_FLAGS = ("-i", "--in")
+    EMAIL_FLAGS = ("-e", "--email")
+    OUT_FLAGS = ("-o", "--out")
+    HELP_FLAGS = ("-h", "--help")
+    SHORT_OPTS = IN_FLAGS[0][-1] + ":" + \
+                 EMAIL_FLAGS[0][-1] + ":" + \
+                 OUT_FLAGS[0][-1] + ":" + \
+                 HELP_FLAGS[0][-1]
+    LONG_OPTS = (IN_FLAGS[1][2:] + "=",
+                 EMAIL_FLAGS[1][2:] + "=",
+                 OUT_FLAGS[1][2:] + "=",
+                 HELP_FLAGS[1][2:])
     
-        # make sure the email address is valid
-        if not __validEmailAddress(email):
-            raise ValueError(EMAIL_ERR)
+    # messages
+    ERR_MSG_1 = "input file is invalid or missing"
+    ERR_MSG_2 = "specified output is not a directory"
+    ERR_MSG_3 = "specified email address is invalid"
+    ERR_MSG_4 = "must specify all required arguments"
+    IGNORE_MSG = "ignoring unused argument: "
     
-    # email address is a required parameter
+    # helper function to print the help message
+    def printHelpMsg() -> None:
+        """ prints a help message if requested
+        """
+        GAP = " "*4
+        EOL = "\n"
+        SEP = ", "
+        HELP_MSG = EOL + "Downloads gbff files from a file containing NCBI Assembly Accession numbers" + EOL + \
+                   GAP + "Joseph S. Wirth, 2023" + EOL*2 + \
+                   "Usage:" + EOL + \
+                   GAP + "python3 downloadAssemblies.py [-ieoh]" + EOL*2 + \
+                   "Required arguments:" + EOL + \
+                   GAP + f'{IN_FLAGS[0] + SEP + IN_FLAGS[1]:<15}{"input file containing accession numbers (one per line)"}' + EOL + \
+                   GAP + f'{EMAIL_FLAGS[0] + SEP + EMAIL_FLAGS[1]:<15}{"email address (for communicating with NCBI; not stored)"}' + EOL*2 + \
+                   "Optional arguments:" + EOL + \
+                   GAP + f'{OUT_FLAGS[0] + SEP + OUT_FLAGS[1]:<15}{"output directory where files will be downloaded (default: cwd)"}' + EOL + \
+                   GAP + f'{HELP_FLAGS[0] + SEP + HELP_FLAGS[1]:<15}{"print this message"}' + EOL
+                
+        print(HELP_MSG)
+
+    # set default values
+    accnFN = None
+    email = None
+    outdir = os.getcwd()
+    helpRequested = False
+    
+    # print help if requested or if no arguments provided
+    if HELP_FLAGS[0] in sys.argv or HELP_FLAGS[1] in sys.argv or len(sys.argv) == 1:
+        helpRequested = True
+        printHelpMsg()
+
     else:
-        raise BaseException(EMAIL_ERR)
-    
-    # get the accession numbers
-    if INPUT_FLAG in sys.argv:
-        # the accession filename should be one index beyond the flag
-        idx = sys.argv.index(INPUT_FLAG)
-        try:
-            accnFN = sys.argv[idx+1]
-        except:
-            raise BaseException(INPUT_ERR)
+        # parse then command line arguments
+        opts,args = getopt.getopt(sys.argv[1:], SHORT_OPTS, LONG_OPTS)
+        for opt,arg in opts:
+            # get the input file
+            if opt in IN_FLAGS:
+                if not os.path.isfile(arg):
+                    raise ValueError(ERR_MSG_1)
+                accnFN = arg
+            
+            # get the email address
+            elif opt in EMAIL_FLAGS:
+                if not __validEmailAddress(arg):
+                    raise ValueError(ERR_MSG_3)
+                email = arg
+            
+            # get the out directory
+            elif opt in OUT_FLAGS:
+                if not os.path.exists(arg):
+                    os.mkdir(arg)
+                elif not os.path.isdir(arg):
+                    raise ValueError(ERR_MSG_2)
+                outdir = arg
+            
+            # ignore all other arguments
+            else:
+                print(IGNORE_MSG + opt + " " + arg)
         
-        # extract the accession numbers from the file
-        accnL = __parseAccessionFile(accnFN)
+        # must provide an email and an input file    
+        if None in (email,accnFN):
+            raise ValueError(ERR_MSG_4)
     
-    # accession file is a required parameter
-    else:
-        raise BaseException(INPUT_ERR)
-    
-    # get the output directory
-    if OUTDIR_FLAG in sys.argv:
-        # directory should be one index beyond the flag
-        idx = sys.argv.index(OUTDIR_FLAG)
-        try:
-            outdir = sys.argv[idx+1]
-
-        except:
-            raise BaseException(BASIC_ERR)
-        
-        # make the directory if it does not exist
-        if not os.path.exists(outdir):
-            os.mkdir(outdir)
-        
-        # make sure it is a directory if it does exist
-        else:
-            if not os.path.isdir(outdir):
-                raise ValueError(OUTDIR_ERR)
-        
-        
-    
-    # outdir is optional; default to current working directory if absent
-    else:
-        outdir = os.getcwd()
-    
-    return email,accnL,outdir
-
-
-def __printHelpMsg() -> None:
-    """ prints a help message if requested
-    """
-    GAP = "    "
-    HELP_MSG = "\nDownloads gbff files from a file containing NCBI Assembly Accession numbers\n" + \
-               GAP + "Joseph S. Wirth, 2023\n\n" + \
-               "Usage:\n" + GAP + "python3 downloadAssemblies.py [-eioh]\n\n" + \
-               "Required arguments:\n" + \
-               GAP + "-e" + GAP*2 + "email address (for communicating with NCBI; not stored)\n" + \
-               GAP + "-i" + GAP*2 + "input file containing accession numbers (one per line)\n\n" + \
-               "Optional arguments:\n" + \
-               GAP + "-o" + GAP*2 + "output directory where files will be downloaded (default: cwd)\n" + \
-               GAP + "-h" + GAP*2 + "print this help message; incompatible with all other flags\n"
-               
-    print(HELP_MSG)
+    return email,accnFN,outdir,helpRequested
 
 
 def __parseAccessionFile(accnFN:str) -> list[str]:
@@ -444,31 +436,16 @@ def __cleanup() -> None:
 
 def __main() -> None:
     """ main wrapper function
-
-    Raises:
-        BaseException: invalid usage
     """
-    # constants
-    HELP_FLAG = "-h"
-    BASIC_ERR = "invalid usage. use -h flag for help."
+    # parse the arguments
+    email,accnFN,outdir,helpRequested = __parseArgs()
 
-    if len(sys.argv) == 1:
-      __printHelpMsg() 
-
-    elif len(sys.argv) == 2:
-        if sys.argv[1] == HELP_FLAG:
-            __printHelpMsg()
-            return
-        else:
-            raise BaseException(BASIC_ERR)
-    else:
-        # parse the arguments
-        email,accnL,outdir = __parseArgs()
-
+    if not helpRequested:
         # set the email address
         Entrez.email = email
 
         # get a list of uids for the assembly database
+        accnL = __parseAccessionFile(accnFN)
         searchStr = __makeAssemblySearchString(accnL)
         uidsL = __assemblyIdsFromSearchTerm(searchStr, len(accnL))
 
