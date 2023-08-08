@@ -19,7 +19,7 @@
 #$ -cwd
 
 # email notifications to me; if job aborts (a), when it begins (b), and when it exits (e)
-#$ -M uma2@cdc.gov
+#$ -M <YOUR EMAIL ADDRESS>
 #$ -m abe
 ##------------------------------##
 
