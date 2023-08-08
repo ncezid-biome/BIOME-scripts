@@ -68,7 +68,7 @@ def __writeRecord(rec:list[SeqRecord], fh:TextIOWrapper, format:str) -> None:
     SeqIO.write(rec, fh, format)
 
 
-def __parseArgs() -> tuple[str,list[str],int,int,TextIOWrapper,str]:
+def __parseArgs() -> tuple[str,list[str],int,int,TextIOWrapper,str,bool]:
     """ parses command line arguments
 
     Raises:
