@@ -6,7 +6,7 @@ from Bio import Entrez
 from Bio.Entrez import Parser
 
 
-def __parseArgs() -> tuple[str,str,str,bool]:
+def __parseArgs() -> tuple[str,str,str,bool,bool]:
     """parses command line arguments
 
     Raises:
@@ -16,20 +16,23 @@ def __parseArgs() -> tuple[str,str,str,bool]:
         ValueError: missing one or more required arguments
 
     Returns:
-        tuple[str,str,str,bool]: email, in file, out directory, help requested?
+        tuple[str,str,str,bool]: email, in file, out directory, rename files?, help requested?
     """
     # flags
     IN_FLAGS = ("-i", "--in")
     EMAIL_FLAGS = ("-e", "--email")
     OUT_FLAGS = ("-o", "--out")
+    RENAME_FLAGS = ("-r", "--rename")
     HELP_FLAGS = ("-h", "--help")
     SHORT_OPTS = IN_FLAGS[0][-1] + ":" + \
                  EMAIL_FLAGS[0][-1] + ":" + \
                  OUT_FLAGS[0][-1] + ":" + \
+                 RENAME_FLAGS[0][-1] + \
                  HELP_FLAGS[0][-1]
     LONG_OPTS = (IN_FLAGS[1][2:] + "=",
                  EMAIL_FLAGS[1][2:] + "=",
                  OUT_FLAGS[1][2:] + "=",
+                 RENAME_FLAGS[1][2:] + \
                  HELP_FLAGS[1][2:])
     
     # messages
@@ -51,11 +54,12 @@ def __parseArgs() -> tuple[str,str,str,bool]:
                    "Usage:" + EOL + \
                    GAP + "python3 downloadAssemblies.py [-ieoh]" + EOL*2 + \
                    "Required arguments:" + EOL + \
-                   GAP + f'{IN_FLAGS[0] + SEP + IN_FLAGS[1]:<15}{"input file containing accession numbers (one per line)"}' + EOL + \
-                   GAP + f'{EMAIL_FLAGS[0] + SEP + EMAIL_FLAGS[1]:<15}{"email address (for communicating with NCBI; not stored)"}' + EOL*2 + \
+                   GAP + f'{IN_FLAGS[0] + SEP + IN_FLAGS[1]:<16}{"input file containing accession numbers (one per line)"}' + EOL + \
+                   GAP + f'{EMAIL_FLAGS[0] + SEP + EMAIL_FLAGS[1]:<16}{"email address (for communicating with NCBI; not stored)"}' + EOL*2 + \
                    "Optional arguments:" + EOL + \
-                   GAP + f'{OUT_FLAGS[0] + SEP + OUT_FLAGS[1]:<15}{"output directory where files will be downloaded (default: cwd)"}' + EOL + \
-                   GAP + f'{HELP_FLAGS[0] + SEP + HELP_FLAGS[1]:<15}{"print this message"}' + EOL
+                   GAP + f'{OUT_FLAGS[0] + SEP + OUT_FLAGS[1]:<16}{"output directory where files will be downloaded (default: cwd)"}' + EOL + \
+                   GAP + f'{RENAME_FLAGS[0] + SEP + RENAME_FLAGS[1]:<16}{"rename downloaded files to match the input file (default: no)"}' + EOL + \
+                   GAP + f'{HELP_FLAGS[0] + SEP + HELP_FLAGS[1]:<16}{"print this message"}' + EOL
                 
         print(HELP_MSG)
 
@@ -63,6 +67,7 @@ def __parseArgs() -> tuple[str,str,str,bool]:
     accnFN = None
     email = None
     outdir = os.getcwd()
+    rename = False
     helpRequested = False
     
     # print help if requested or if no arguments provided
@@ -94,6 +99,10 @@ def __parseArgs() -> tuple[str,str,str,bool]:
                     raise ValueError(ERR_MSG_2)
                 outdir = arg
             
+            # determine if renaming will occur
+            elif opt in RENAME_FLAGS:
+                rename = True
+            
             # ignore all other arguments
             else:
                 print(IGNORE_MSG + opt + " " + arg)
@@ -102,7 +111,7 @@ def __parseArgs() -> tuple[str,str,str,bool]:
         if None in (email,accnFN):
             raise ValueError(ERR_MSG_4)
     
-    return email,accnFN,outdir,helpRequested
+    return email,accnFN,outdir,rename,helpRequested
 
 
 def __parseAccessionFile(accnFN:str) -> list[str]:
@@ -394,12 +403,15 @@ def __decompressGZ(gzFileName:str) -> None:
     os.remove(gzFileName)
 
 
-def __downloadGbff(ftpPath:str, gbffDir:str) -> None:
+def __downloadGbff(ftpPath:str, gbffDir:str) -> str:
     """ a wrapper function to download gbff from NCBI using FTP protocol
 
     Args:
         ftpPath (str): the FTP address
         gbffDir (str): the directory where the file should be saved
+    
+    Returns:
+        str: the filename for the downloaded gbff file
     """
     # constants
     NCBI_FTP  = "ftp.ncbi.nlm.nih.gov"
@@ -422,6 +434,24 @@ def __downloadGbff(ftpPath:str, gbffDir:str) -> None:
 
     # unpack the gz
     __decompressGZ(gzFileName)
+    
+    return gbffFileName
+
+
+def __renameFile(fn:str, base:str) -> None:
+    """renames a file to match the accession number
+
+    Args:
+        fn (str): file to be renamed
+        base (str): the basename for the renamed file
+    """
+    # get the directory and extension of the input file
+    directory = os.path.dirname(fn)
+    extension = os.path.splitext(fn)[1]
+    
+    # create the new filename and then rename the old file
+    newFN = os.path.join(directory, base + extension)
+    os.rename(fn, newFN)
 
 
 def __cleanup() -> None:
@@ -438,7 +468,7 @@ def __main() -> None:
     """ main wrapper function
     """
     # parse the arguments
-    email,accnFN,outdir,helpRequested = __parseArgs()
+    email,accnFN,outdir,rename,helpRequested = __parseArgs()
 
     if not helpRequested:
         # set the email address
@@ -446,16 +476,18 @@ def __main() -> None:
 
         # get a list of uids for the assembly database
         accnL = __parseAccessionFile(accnFN)
-        searchStr = __makeAssemblySearchString(accnL)
-        uidsL = __assemblyIdsFromSearchTerm(searchStr, len(accnL))
+        
+        for accn in accnL:
+            uidsL = __assemblyIdsFromSearchTerm(accn, 1)
+            
+            # use the uids to get assembly summaries
+            sumL = __getAssemblySummary(uidsL)
 
-        # use the uids to get assembly summaries
-        sumL = __getAssemblySummary(uidsL)
-
-        # download each of the files and extract them
-        for sum in sumL:
-            ftp = __getFtpPathFromAssSummary(sum)
-            __downloadGbff(ftp, outdir)
+            ftp = __getFtpPathFromAssSummary(sumL.pop())
+            gbffFN = __downloadGbff(ftp, outdir)
+            
+            if rename:
+                __renameFile(gbffFN, accn)
 
         # remove unnecessary files
         __cleanup()
