@@ -107,7 +107,7 @@ def __printHelpMsg() -> None:
                GAP + "-e" + GAP*2 + "email address (for communicating with NCBI; not stored)\n" + \
                GAP + "-i" + GAP*2 + "input file containing accession numbers (one per line)\n\n" + \
                "Optional arguments:\n" + \
-               GAP + "-o" + GAP*2 + "output directory where files will be downloaded\n" + \
+               GAP + "-o" + GAP*2 + "output directory where files will be downloaded (default: cwd)\n" + \
                GAP + "-h" + GAP*2 + "print this help message; incompatible with all other flags\n"
                
     print(HELP_MSG)
