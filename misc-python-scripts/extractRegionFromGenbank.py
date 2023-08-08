@@ -80,21 +80,27 @@ def __parseArgs() -> tuple[str,list[str],int,int,TextIOWrapper,str]:
             input file, contig, start position, end position, out filehandle, out format
     """
     # flags
-    SHORT_OPTS = "i:c:s:e:o:f:h"
-    LONG_OPTS = ("input=",
-                 "contig=",
-                 "start=",
-                 "end=",
-                 "out=",
-                 "outfmt=",
-                 "help")
-    INPUT_FLAGS = ("-i","--input")
+    INPUT_FLAGS = ("-i","--in")
     CONTIG_FLAGS = ("-c","--contig")
     START_FLAGS = ("-s","--start")
     END_FLAGS = ("-e","--end")
     OUT_FLAGS = ("-o","--out")
     FORMAT_FLAGS = ("-f","--outfmt")
     HELP_FLAGS = ("-h","--help")
+    SHORT_OPTS = INPUT_FLAGS[0][-1] + ":" + \
+                 CONTIG_FLAGS[0][-1] + ":" + \
+                 START_FLAGS[0][-1] + ":" + \
+                 END_FLAGS[0][-1] + ":" + \
+                 OUT_FLAGS[0][-1] + ":" + \
+                 FORMAT_FLAGS[0][-1] + ":" + \
+                 HELP_FLAGS[0][-1]
+    LONG_OPTS = (INPUT_FLAGS[1][2:] + "=",
+                 CONTIG_FLAGS[1][2:] + "=",
+                 START_FLAGS[1][2:] + "=",
+                 END_FLAGS[1][2:] + "=",
+                 OUT_FLAGS[1][2:] + "=",
+                 FORMAT_FLAGS[1][2:] + "=",
+                 HELP_FLAGS[1][2:])
     
     # default values
     DEFAULT_START = 1
@@ -113,6 +119,29 @@ def __parseArgs() -> tuple[str,list[str],int,int,TextIOWrapper,str]:
     ERR_MSG_5 = "input file not specified"
     ERR_MSG_6 = "contig name(s) not specified"
     
+    # helper function for printing help messages
+    def helpMessage() -> None:
+        """ prints the help message
+        """
+        GAP = 4*" "
+        EOL = "\n"
+        SEP = ", "
+        MSG = EOL + "Extracts a region from a genbank file" + EOL + \
+             GAP + "Joseph S. Wirth, 2023" + EOL*2 + \
+             "usage:" +  EOL + \
+             GAP + "extractRegionFromGenbank.py [-icseofh]" + EOL*2 + \
+             "required arguments:" + EOL + \
+             GAP + f'{INPUT_FLAGS[0] + SEP + INPUT_FLAGS[1]:<16}{"[str] the filename of an input genbank file"}' + EOL +\
+             GAP + f'{CONTIG_FLAGS[0] + SEP + CONTIG_FLAGS[1]:<16}{"[str] the name of the contig(s) (comma-separated) within the input file"}' + EOL*2 + \
+             "optional arguments:" + EOL + \
+             GAP + f'{OUT_FLAGS[0] + SEP + OUT_FLAGS[1]:<16}{"[str] the output filename (default: stdout)"}' + EOL + \
+             GAP + f'{START_FLAGS[0] + SEP + START_FLAGS[1]:<16}{"[int] the start position (default: contig start)"}' + EOL + \
+             GAP + f'{END_FLAGS[0] + SEP + END_FLAGS[1]:<16}{"[int] the end position (default: contig end)"}' + EOL + \
+             GAP + f'{FORMAT_FLAGS[0] + SEP + FORMAT_FLAGS[1]:<16}{"[str] the output format [fasta|genbank](default: genbank)"}' + EOL + \
+             GAP + f'{HELP_FLAGS[0] + SEP + HELP_FLAGS[1]:<16}{"print this help message"}' + EOL
+            
+        print(MSG)
+    
     # set default values
     inFN = None
     contigs = None
@@ -120,106 +149,82 @@ def __parseArgs() -> tuple[str,list[str],int,int,TextIOWrapper,str]:
     end = DEFAULT_END
     outFH = DEFAULT_OUT
     outfmt = DEFAULT_FORMAT
+    helpRequested = False
     
     # print the help message then exit if help was requested
-    if HELP_FLAGS[0] in sys.argv or HELP_FLAGS[1] in sys.argv:
-        __helpMessage()
-        return inFN,contigs,start,end,outFH,outfmt
+    if HELP_FLAGS[0] in sys.argv or HELP_FLAGS[1] in sys.argv or len(sys.argv) == 1:
+        helpMessage()
+        helpRequested = True
     
-    # extract command line arguments
-    opts,args = getopt.getopt(sys.argv[1:], SHORT_OPTS, LONG_OPTS)
-    
-    # parse each command line argument
-    for opt,arg in opts:
-        # get the input filename
-        if opt in INPUT_FLAGS:
-            if not os.path.exists(arg):
-                raise FileNotFoundError(ERR_MSG_1)
-            inFN = arg
+    else:
+        # extract command line arguments
+        opts,args = getopt.getopt(sys.argv[1:], SHORT_OPTS, LONG_OPTS)
         
-        # get the contig name(s)
-        elif opt in CONTIG_FLAGS:
-            contigs = arg.split(",")
+        # parse each command line argument
+        for opt,arg in opts:
+            # get the input filename
+            if opt in INPUT_FLAGS:
+                if not os.path.exists(arg):
+                    raise FileNotFoundError(ERR_MSG_1)
+                inFN = arg
+            
+            # get the contig name(s)
+            elif opt in CONTIG_FLAGS:
+                contigs = arg.split(",")
+            
+            # get the start position
+            elif opt in START_FLAGS:
+                start = int(arg)
+            
+            # get the end position
+            elif opt in END_FLAGS:
+                end = int(arg)
+            
+            # get the output filename
+            elif opt in OUT_FLAGS:
+                if os.path.exists(arg):
+                    raise FileExistsError(ERR_MSG_2)
+                try:
+                    outFH = open(arg, 'w')
+                except:
+                    raise IOError(ERR_MSG_3)
+            
+            # get the output file format
+            elif opt in FORMAT_FLAGS:
+                if arg not in ALLOWED_FORMATS:
+                    raise ValueError(ERR_MSG_4)
+                outfmt = arg
         
-        # get the start position
-        elif opt in START_FLAGS:
-            start = int(arg)
+            # ignore any other arguments
+            else:
+                print(IGNORE_MSG + opt)
         
-        # get the end position
-        elif opt in END_FLAGS:
-            end = int(arg)
+        # make sure all required arguments have been provided
+        if inFN is None:
+            raise ValueError(ERR_MSG_5)
+        if contigs is None:
+            raise ValueError(ERR_MSG_6)
         
-        # get the output filename
-        elif opt in OUT_FLAGS:
-            if os.path.exists(arg):
-                raise FileExistsError(ERR_MSG_2)
-            try:
-                outFH = open(arg, 'w')
-            except:
-                raise IOError(ERR_MSG_3)
+        # check if the positional coordinates have been modified
+        coordsModified = start != DEFAULT_START or end != DEFAULT_END
         
-        # get the output file format
-        elif opt in FORMAT_FLAGS:
-            if arg not in ALLOWED_FORMATS:
-                raise ValueError(ERR_MSG_4)
-            outfmt = arg
+        # cannot use positional coordinates if extracting multiple contigs
+        if len(contigs) > 1 and coordsModified:
+            start = DEFAULT_START
+            end = DEFAULT_END
+            print(NO_COORDS_ALLOWED)
     
-        # ignore any other arguments
-        else:
-            print(IGNORE_MSG + opt)
-    
-    # make sure all required arguments have been provided
-    if inFN is None:
-        raise ValueError(ERR_MSG_5)
-    if contigs is None:
-        raise ValueError(ERR_MSG_6)
-    
-    # check if the positional coordinates have been modified
-    coordsModified = start != DEFAULT_START or end != DEFAULT_END
-    
-    # cannot use positional coordinates if extracting multiple contigs
-    if len(contigs) > 1 and coordsModified:
-        start = DEFAULT_START
-        end = DEFAULT_END
-        print(NO_COORDS_ALLOWED)
-    
-    return inFN, contigs, start, end, outFH, outfmt
-
-
-def __helpMessage() -> None:
-    """ prints the help message
-    """
-    GAP = 4*" "
-    MSG = "\nExtracts a region from a genbank file\n" + \
-          GAP + "Joseph S. Wirth, 2023\n\n" + \
-          "Usage:\n" + \
-          GAP + "extractRegionFromGenbank.py [-icseofh]\n\n" + \
-          "required arguments:\n" + \
-          GAP + "-i, --input     [str] the filename of an input genbank file\n" + \
-          GAP + "-c, --contig    [str] the name of the contig(s) (comma-separated) within the input file\n\n" + \
-          "optional arguments:\n" + \
-          GAP + "-o, --out       [str] the output filename (default: stdout)\n" + \
-          GAP + "-s, --start     [int] the start position (default: contig start)\n" + \
-          GAP + "-e, --end       [int] the end position (default: contig end)\n" + \
-          GAP + "-f, --outfmt    [str] the output format (fasta|genbank)\n" + \
-          GAP + "-h, --help            print this help message\n"
-        
-    print(MSG)
+    return inFN, contigs, start, end, outFH, outfmt, helpRequested
 
 
 def __main():
     """ main runner function
     """
-    # handle no arguments
-    if len(sys.argv) == 1:
-        __helpMessage()
-        return
-    
     # parse the arguments
-    inFN, contigs, start, end, outFH, outfmt = __parseArgs()
+    inFN, contigs, start, end, outFH, outfmt, helpRequested = __parseArgs()
     
     # inFN will be None if a help flag was specified
-    if inFN is not None:
+    if not helpRequested:
         recs = __extractRecord(inFN, contigs, start, end)
         __writeRecord(recs, outFH, outfmt)
         if outFH != sys.stdout:
