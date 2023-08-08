@@ -103,26 +103,6 @@ def _getSrrList(srrFH:TextIOWrapper) -> list[str]:
     return outL
 
 
-def __helpMessage() -> None:
-    """ prints the help message
-    """
-    GAP = 4*" "
-    EOL = "\n"
-    MSG = "\nDownloads SRA files in parallel" + EOL + \
-          GAP + "Joseph S. Wirth, 2023" + EOL*2 + \
-          "Usage:" + EOL + \
-          GAP + "downloadSRA.py [-idnph]" + EOL*2 + \
-          "required arguments:" + EOL + \
-          GAP + f'{"-i, --input":<30}{"[str] a file containing one SRR ID per line":<}' + EOL*2 + \
-          "optional arguments:\n" + \
-          GAP + f'{"-d, --dir":<30}{"[str] the directory where reads will be saved":<54}{"(default: current wd)":<}' + EOL + \
-          GAP + f'{"-t, --max_threads":<30}{"[int] the maximum allowed number of threads":<54}{"(default: 1)":<}' + EOL + \
-          GAP + f'{"-p, --threads_per_download":<30}{"[int] the number of threads to use for each download":<54}{"(default: 1)":<}' + EOL + \
-          GAP + f'{"-h, --help":<30}{"print this help message":<}' + EOL
-        
-    sys.stdout.write(MSG)
-
-
 def __parseArgs() -> tuple[str,str,int,int,bool]:
     """parses command line arguments
 
@@ -168,6 +148,27 @@ def __parseArgs() -> tuple[str,str,int,int,bool]:
     ERR_MSG_5 = "must specify an input file (-i;--in)"
     ERR_MSG_6 = "number of threads per download cannot exceed the maximum number of threads"
     
+    # helper function to print help message 
+    def helpMessage() -> None:
+        """ prints the help message
+        """
+        GAP = 4*" "
+        EOL = "\n"
+        SEP = ", "
+        MSG = "\nDownloads SRA files in parallel" + EOL + \
+            GAP + "Joseph S. Wirth, 2023" + EOL*2 + \
+            "Usage:" + EOL + \
+            GAP + "downloadSRA.py [-idnph]" + EOL*2 + \
+            "required arguments:" + EOL + \
+            GAP + f'{INPUT_FLAGS[0] + SEP + INPUT_FLAGS[1]:<30}{"[str] a file containing one SRR ID per line":<}' + EOL*2 + \
+            "optional arguments:\n" + \
+            GAP + f'{DIR_FLAGS[0] + SEP + DIR_FLAGS[1]:<30}{"[str] the directory where reads will be saved (default: current wd)":<}' + EOL + \
+            GAP + f'{THREADS_FLAGS_1[0] + SEP + THREADS_FLAGS_1[1]:<30}{"[int] the maximum allowed number of threads (default: 1)":<}' + EOL + \
+            GAP + f'{THREADS_FLAGS_2[0] + SEP + THREADS_FLAGS_2[1]:<30}{"[int] the number of threads to use for each download default: 1)":<}' + EOL + \
+            GAP + f'{HELP_FLAGS[1] + SEP + HELP_FLAGS[1]:<30}{"print this help message":<}' + EOL
+        
+        print(MSG)
+    
     # set default values
     inFN = None
     outDir = DEFAULT_DIR
@@ -179,7 +180,7 @@ def __parseArgs() -> tuple[str,str,int,int,bool]:
     
     # print the help message then exit (if help was requested or no arguments)
     if helpRequested:
-        __helpMessage()
+        helpMessage()
         
     else:
         # extract command line arguments
