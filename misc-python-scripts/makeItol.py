@@ -2,7 +2,7 @@
 import getopt, os, rpy2.robjects, sys
 
 # global variables
-JOB_0 = ""
+JOB_0 = "help"
 JOB_1 = "colorstrip"
 JOB_2 = "binary"
 
@@ -76,8 +76,9 @@ def __parseArgs() -> tuple[str,str,str,str,str,bool]:
                  GAP + "Joseph S. Wirth, 2023" + EOL*2 + "usage:" + EOL
         HELP_0 = GAP + "python3.11 makeItol.py TASK [OPTIONS]" + EOL * 2 + \
                  "Available tasks:" + EOL + \
-                 GAP + f"{'colorstrip':<14}{'makes a color strip dataset iToL file':<}" + EOL + \
-                 GAP + f"{'binary':<14}{'makes a binary dataset iToL file':<}" + EOL*2 + \
+                 GAP + f"{JOB_1:<14}{'makes a color strip dataset iToL file':<}" + EOL + \
+                 GAP + f"{JOB_2:<14}{'makes a binary dataset iToL file':<}" + EOL + \
+                 GAP + f"{JOB_0:<14}{'print this message':<}" + EOL*2 + \
                  "Run 'python3.11 makeItol.py TASK --help' for help with a specific task." + EOL
         HELP_1 = GAP + "python3.11 makeItol.py " + JOB_1 + " [-ioLdh]" + EOL*2 + \
                  "required arguments:" + EOL + \
@@ -85,16 +86,16 @@ def __parseArgs() -> tuple[str,str,str,str,str,bool]:
                  GAP + f"{OUT_FLAGS[0] + SEP + OUT_FLAGS[1]:<14}{'[file] the output filename'}" + EOL + \
                  GAP + f"{LABEL_FLAGS[0] + SEP + LABEL_FLAGS[1]:<14}{'[str] a label for the dataset'}" + EOL*2 + \
                  "optional arguments:" + EOL + \
-                 GAP + f"{DELIM_FLAGS[0] + SEP + DELIM_FLAGS[1]:<14}{'[str] the delimiter for the output file [COMMA, SPACE, TAB]'}" + EOL + \
-                 GAP + f"{HELP_FLAGS[0] + SEP + DELIM_FLAGS[1]:<14}{'print this message'}" + EOL
+                 GAP + f"{DELIM_FLAGS[0] + SEP + DELIM_FLAGS[1]:<14}{'[str] the delimiter for the output file [COMMA, SPACE, TAB] (default: COMMA)'}" + EOL + \
+                 GAP + f"{HELP_FLAGS[0] + SEP + HELP_FLAGS[1]:<14}{'print this message'}" + EOL
         HELP_2 = GAP + "python3.11 makeItol.py " + JOB_2 + " [-ioLdh]" + EOL*2 + \
                  "required arguments:" + EOL + \
                  GAP + f"{IN_FLAGS[0] + SEP + IN_FLAGS[1]:<14}{'[file] a csv containing a header and two or more columns (name, val1, val2, etc.)'}" + EOL + \
                  GAP + f"{OUT_FLAGS[0] + SEP + OUT_FLAGS[1]:<14}{'[file] the output filename'}" + EOL + \
                  GAP + f"{LABEL_FLAGS[0] + SEP + LABEL_FLAGS[1]:<14}{'[str] a label for the dataset'}" + EOL*2 + \
                  "optional arguments:" + EOL + \
-                 GAP + f"{DELIM_FLAGS[0] + SEP + DELIM_FLAGS[1]:<14}{'[str] the delimiter for the output file [COMMA, SPACE, TAB]'}" + EOL + \
-                 GAP + f"{HELP_FLAGS[0] + SEP + DELIM_FLAGS[1]:<14}{'print this message'}" + EOL
+                 GAP + f"{DELIM_FLAGS[0] + SEP + DELIM_FLAGS[1]:<14}{'[str] the delimiter for the output file [COMMA, SPACE, TAB] (default: COMMA)'}" + EOL + \
+                 GAP + f"{HELP_FLAGS[0] + SEP + HELP_FLAGS[1]:<14}{'print this message'}" + EOL
         
         if task == JOB_0:
             return HEADER + HELP_0
@@ -121,11 +122,16 @@ def __parseArgs() -> tuple[str,str,str,str,str,bool]:
     else:
         # extract the task; make sure it is valid
         task = sys.argv[1]
-        if task not in (JOB_1,JOB_2):
+        
+        if task not in (JOB_0,JOB_1,JOB_2):
             raise ValueError(ERR_MSG_0 + task)
+    
+        if task == JOB_0:
+            helpRequested = True
+            print(getHelpMessage(task))
         
         # handle task provided; no arguments
-        if len(sys.argv) == 2:
+        elif len(sys.argv) == 2:
             helpRequested = True
             print(getHelpMessage(task))
         
@@ -206,18 +212,19 @@ def __parseCsv(fn:str, task:str) -> dict:
             
             # if not the header
             else:
-                # extract the tip name
-                name = row[0]
-                
-                # make the colorstrip dictionary
-                if task == JOB_1:
-                    outD[name] = row[1]
-                
-                # make the binary dictionary
-                elif task == JOB_2:
-                    outD[name] = dict()
-                    for idx in range(1, len(row)):
-                        outD[name][indexD[idx]] = str(int(row[idx]))
+                if line != '':
+                    # extract the tip name
+                    name = row[0]
+                    
+                    # make the colorstrip dictionary
+                    if task == JOB_1:
+                        outD[name] = row[1]
+                    
+                    # make the binary dictionary
+                    elif task == JOB_2:
+                        outD[name] = dict()
+                        for idx in range(1, len(row)):
+                            outD[name][indexD[idx]] = str(int(row[idx]))
     
     return outD
   
