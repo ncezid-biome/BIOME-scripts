@@ -85,7 +85,7 @@ def __parseArgs() -> tuple[str,list[str],int,int,TextIOWrapper,str,bool]:
     START_FLAGS = ("-s","--start")
     END_FLAGS = ("-e","--end")
     OUT_FLAGS = ("-o","--out")
-    FORMAT_FLAGS = ("-f","--outfmt")
+    FORMAT_FLAGS = ("-f","--format")
     HELP_FLAGS = ("-h","--help")
     SHORT_OPTS = INPUT_FLAGS[0][-1] + ":" + \
                  CONTIG_FLAGS[0][-1] + ":" + \
@@ -137,8 +137,8 @@ def __parseArgs() -> tuple[str,list[str],int,int,TextIOWrapper,str,bool]:
              GAP + f'{OUT_FLAGS[0] + SEP + OUT_FLAGS[1]:<16}{"[str] the output filename (default: stdout)"}' + EOL + \
              GAP + f'{START_FLAGS[0] + SEP + START_FLAGS[1]:<16}{"[int] the start position (default: contig start)"}' + EOL + \
              GAP + f'{END_FLAGS[0] + SEP + END_FLAGS[1]:<16}{"[int] the end position (default: contig end)"}' + EOL + \
-             GAP + f'{FORMAT_FLAGS[0] + SEP + FORMAT_FLAGS[1]:<16}{"[str] the output format [fasta|genbank](default: genbank)"}' + EOL + \
-             GAP + f'{HELP_FLAGS[0] + SEP + HELP_FLAGS[1]:<16}{"print this help message"}' + EOL
+             GAP + f'{FORMAT_FLAGS[0] + SEP + FORMAT_FLAGS[1]:<16}{"[str] the output format [fasta|genbank] (default: genbank)"}' + EOL + \
+             GAP + f'{HELP_FLAGS[0] + SEP + HELP_FLAGS[1]:<16}{"print this message"}' + EOL
             
         print(MSG)
     
