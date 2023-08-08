@@ -93,10 +93,12 @@ def _getSrrList(srrFH:TextIOWrapper) -> list[str]:
     outL = list()
     for line in srrFH:
         # chomp eol characters
-        while line[-1] == EOL:
+        if line[-1] == EOL:
             line = line[:-1]
         
-        outL.append(line)
+        # ignore empty lines
+        if line != '':
+            outL.append(line)
     
     return outL
 
@@ -136,17 +138,21 @@ def __parseArgs() -> tuple[str,str,int,int,bool]:
         tuple[str,str,int,int,bool]: input filename, output directory, max number of threads, threads per call, help requested?
     """
     # flags
-    SHORT_OPTS = "i:d:t:p:h"
-    LONG_OPTS = ("in=",
-                 "dir=",
-                 "max_threads=",
-                 "threads_per_download="
-                 "help")
-    INPUT_FLAGS = {"-i", "--in"}
-    DIR_FLAGS = {"-d", "--dir"}
-    THREADS_FLAGS_1 = {"-t", "--max_threads"}
-    THREADS_FLAGS_2 = {"-p", "--threads_per_download"}
+    INPUT_FLAGS = ("-i", "--in")
+    DIR_FLAGS = ("-d", "--dir")
+    THREADS_FLAGS_1 = ("-t", "--max_threads")
+    THREADS_FLAGS_2 = ("-p", "--threads_per_download")
     HELP_FLAGS = ("-h", "--help")
+    SHORT_OPTS = INPUT_FLAGS[0][-1] + ":" + \
+                 DIR_FLAGS[0][-1] + ":" + \
+                 THREADS_FLAGS_1[0][-1] + ":" + \
+                 THREADS_FLAGS_2[0][-1] + ":" + \
+                 HELP_FLAGS[0][-1]
+    LONG_OPTS = (INPUT_FLAGS[1][2:] + "=",
+                 DIR_FLAGS[1][2:] + "=",
+                 THREADS_FLAGS_1[1][2:] + "=",
+                 THREADS_FLAGS_2[1][2:] + "=",
+                 HELP_FLAGS[1][2:])
     
     # default values
     DEFAULT_DIR = os.path.curdir
