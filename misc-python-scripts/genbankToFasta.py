@@ -9,7 +9,7 @@ from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import SeqFeature
 
 
-def __parseArgs() -> tuple[str,TextIOWrapper,TextIOWrapper]:
+def __parseArgs() -> tuple[str,TextIOWrapper,TextIOWrapper,bool]:
     """parses command line arguments
 
     Raises:
@@ -22,15 +22,18 @@ def __parseArgs() -> tuple[str,TextIOWrapper,TextIOWrapper]:
         tuple[str,TextIOWrapper,TextIOWrapper]: out format, input filehandle, output filehandle
     """
     # constants
-    SHORT_OPTS = ("i:f:o:h")
-    LONG_OPTS = ("in=",
-                 "format=",
-                 "out=",
-                 "help")
-    FMT_FLAGS = ("-f", "--format")
     IN_FLAGS = ("-i", "--in")
+    FMT_FLAGS = ("-f", "--format")
     OUT_FLAGS = ("-o", "--out")
     HELP_FLAGS = ("-h", "--help")
+    SHORT_OPTS = IN_FLAGS[0][-1] + ":" + \
+                 FMT_FLAGS[0][-1] + ":" + \
+                 OUT_FLAGS[0][-1] + ":" + \
+                 HELP_FLAGS[0][-1]
+    LONG_OPTS = (IN_FLAGS[1][2:] + "=",
+                 FMT_FLAGS[1][2:] + "=",
+                 OUT_FLAGS[1][2:] + "=",
+                 HELP_FLAGS[1][2:])
     ALLOWED_FORMATS = ("nuc", "prot")
     ERR_MSG_1 = "invalid format specified"
     ERR_MSG_2 = "input genbank file not found"
@@ -38,67 +41,71 @@ def __parseArgs() -> tuple[str,TextIOWrapper,TextIOWrapper]:
     ERR_MSG_4 = "please provide an input file and a output format"
     IGNORE_MSG = "ignoring unused argument "
 
+    def helpMessage() -> None:
+        """prints the help message to the screen
+        """
+        GAP = " "*4
+        EOL = "\n"
+        SEP =", "
+        HELP_MSG = EOL + "Converts a genbank file to a nucleotide (fna) or amino acid (faa) fasta" + EOL + \
+                   GAP + "Joseph S. Wirth, 2023" + EOL*2 + \
+                   "Usage:" + EOL + \
+                   GAP + "genbankToFasta.py [-ifoh]" + EOL*2 + \
+                   "Required arguments:" + EOL + \
+                   GAP + f'{IN_FLAGS[0] + SEP + IN_FLAGS[1]:<16}{"input file in genbank file format"}' + EOL + \
+                   GAP + f'{FMT_FLAGS[0] + SEP + FMT_FLAGS[1]:<16}{"output file format {nuc,prot}"}' + EOL*2 +\
+                   "Optional arguments:" + EOL +\
+                   GAP + f'{OUT_FLAGS[0] + SEP + OUT_FLAGS[1]:<16}{"output filename (default: input filename with new extension)"}' + EOL + \
+                   GAP + f'{HELP_FLAGS[0] + SEP + HELP_FLAGS[1]:<16}{"print this message"}' + EOL
+        
+        print(HELP_MSG)
+
     # initialize variables
     outfmt = None
     inFH = None
     outFH = None
+    helpRequested = False
     
     # print the help message if requested then return
-    if HELP_FLAGS[0] in sys.argv or HELP_FLAGS[1] in sys.argv:
-        __helpMessage()
-        return outfmt, inFH, outFH
+    if HELP_FLAGS[0] in sys.argv or HELP_FLAGS[1] in sys.argv or len(sys.argv) == 1:
+        helpMessage()
+        helpRequested = True
 
-    # parse each command line argument
-    opts,args = getopt.getopt(sys.argv[1:], SHORT_OPTS, LONG_OPTS)
-    for opt, arg in opts:
-        # format
-        if opt in FMT_FLAGS:
-            if arg not in ALLOWED_FORMATS:
-                raise ValueError(ERR_MSG_1)
-            outfmt = arg
+    else:
+        # parse each command line argument
+        opts,args = getopt.getopt(sys.argv[1:], SHORT_OPTS, LONG_OPTS)
+        for opt, arg in opts:
+            # format
+            if opt in FMT_FLAGS:
+                if arg not in ALLOWED_FORMATS:
+                    raise ValueError(ERR_MSG_1)
+                outfmt = arg
+            
+            # input file
+            elif opt in IN_FLAGS:
+                if not os.path.exists(arg):
+                    raise FileNotFoundError(ERR_MSG_2)
+                inFH = open(arg, 'r')
         
-        # input file
-        elif opt in IN_FLAGS:
-            if not os.path.exists(arg):
-                raise FileNotFoundError(ERR_MSG_2)
-            inFH = open(arg, 'r')
-    
-        # output file
-        elif opt in OUT_FLAGS:
-            if os.path.exists(arg):
-                raise FileExistsError(ERR_MSG_3)
-            outFH = open(arg, 'w')
-    
-        # ignore any additional arguments
-        else:
-            print(IGNORE_MSG + opt)
+            # output file
+            elif opt in OUT_FLAGS:
+                if os.path.exists(arg):
+                    raise FileExistsError(ERR_MSG_3)
+                outFH = open(arg, 'w')
         
-    # make sure all required arguments have been provided
-    if None in (inFH, outfmt):
-        raise SyntaxError(ERR_MSG_4)
+            # ignore any additional arguments
+            else:
+                print(IGNORE_MSG + opt)
+            
+        # make sure all required arguments have been provided
+        if None in (inFH, outfmt):
+            raise SyntaxError(ERR_MSG_4)
+        
+        # get the default out filehandle if one was not provided
+        if outFH is None:
+            outFH = __getOutFileHandle(inFH.name, outfmt)
     
-    # get the default out filehandle if one was not provided
-    if outFH is None:
-        outFH = __getOutFileHandle(inFH.name, outfmt)
-    
-    return outfmt, inFH, outFH
-
-
-def __helpMessage() -> None:
-    """prints the help message to the screen
-    """
-    GAP = " "*4
-    HELP_MSG = "\nConverts a genbank file to a nucleotide (fna) or amino acid (faa) fasta\n" + \
-                GAP + "Joseph S. Wirth, 2023\n\n" + \
-                "Usage:\n" + GAP + "genbankToFasta.py [-ifoh]\n\n" + \
-                "Required arguments:\n" + \
-                GAP + "-i,--in        input file in genbank file format\n" + \
-                GAP + "-f,--format    output file format {nuc,prot}\n\n" + \
-                "Optional arguments:\n" + \
-                GAP + "-o,--out       output filename (default: input filename with new extension)\n" + \
-                GAP + "-h,--help      print this message\n"
-    
-    print(HELP_MSG)
+    return outfmt, inFH, outFH, helpRequested
 
 
 def __getOutFileHandle(inFN:str, outfmt:str) -> TextIOWrapper:
@@ -261,17 +268,12 @@ def __main() -> None:
     # constants
     FNA = "nuc"
     FAA = "prot"
-
-    # no arguments ==> help message
-    if len(sys.argv) == 1:
-        __helpMessage()
-        return
     
     # parse command line arguments
-    outfmt,inFH,outFH = __parseArgs()
+    outfmt,inFH,outFH,helpRequested = __parseArgs()
     
     # if outfmt is None, then help was requested (nothing to do)
-    if outfmt is not None:
+    if not helpRequested:
         if outfmt == FNA:
             __gbk2fna(inFH, outFH)
         
