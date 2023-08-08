@@ -1,0 +1,18 @@
+# Joseph S. Wirth, 2023
+## provides a conda environment for running the python scripts found in this folder
+## commands:
+##        $ conda env create -f environment.yml
+##        $ conda activate misc-python
+
+name: misc-python
+channels:
+  - bioconda
+  - defaults
+  - conda-forge
+dependencies:
+  - r-base=4.3.1
+  - python=3.11.0
+  - pip=23.0.1
+  - biopython=1.81
+  - pip:
+      - rpy2==3.5.10
