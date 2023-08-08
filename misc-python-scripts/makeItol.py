@@ -78,8 +78,8 @@ def __parseArgs() -> tuple[str,str,str,str,str,bool]:
                  "Available tasks:" + EOL + \
                  GAP + f"{'colorstrip':<14}{'makes a color strip dataset iToL file':<}" + EOL + \
                  GAP + f"{'binary':<14}{'makes a binary dataset iToL file':<}" + EOL*2 + \
-                 "Run 'python3.11 makeItol.py TASK --help for help with a specific task." + EOL
-        HELP_1 = GAP + "python3.11 makeItol.py " + JOB_1 + " [-ioLdh]" + EOL + \
+                 "Run 'python3.11 makeItol.py TASK --help' for help with a specific task." + EOL
+        HELP_1 = GAP + "python3.11 makeItol.py " + JOB_1 + " [-ioLdh]" + EOL*2 + \
                  "required arguments:" + EOL + \
                  GAP + f"{IN_FLAGS[0] + SEP + IN_FLAGS[1]:<14}{'[file] a csv containing a header and exactly two columns (name, value)'}" + EOL + \
                  GAP + f"{OUT_FLAGS[0] + SEP + OUT_FLAGS[1]:<14}{'[file] the output filename'}" + EOL + \
@@ -87,7 +87,7 @@ def __parseArgs() -> tuple[str,str,str,str,str,bool]:
                  "optional arguments:" + EOL + \
                  GAP + f"{DELIM_FLAGS[0] + SEP + DELIM_FLAGS[1]:<14}{'[str] the delimiter for the output file [COMMA, SPACE, TAB]'}" + EOL + \
                  GAP + f"{HELP_FLAGS[0] + SEP + DELIM_FLAGS[1]:<14}{'print this message'}" + EOL
-        HELP_2 = GAP + "python3.11 makeItol.py" + JOB_2 + " [-ioLdh]" + EOL*2 + \
+        HELP_2 = GAP + "python3.11 makeItol.py " + JOB_2 + " [-ioLdh]" + EOL*2 + \
                  "required arguments:" + EOL + \
                  GAP + f"{IN_FLAGS[0] + SEP + IN_FLAGS[1]:<14}{'[file] a csv containing a header and two or more columns (name, val1, val2, etc.)'}" + EOL + \
                  GAP + f"{OUT_FLAGS[0] + SEP + OUT_FLAGS[1]:<14}{'[file] the output filename'}" + EOL + \
@@ -111,9 +111,7 @@ def __parseArgs() -> tuple[str,str,str,str,str,bool]:
     outFN = None
     label = None
     delim = ","
-
-    # determine if help was requested
-    helpRequested = HELP_FLAGS[0] in sys.argv or HELP_FLAGS[1] in sys.argv
+    helpRequested = False
 
     # handle no task
     if len(sys.argv) == 1:
@@ -156,12 +154,16 @@ def __parseArgs() -> tuple[str,str,str,str,str,bool]:
                         raise ValueError(ERR_MSG_2 + arg)
                     delim = DELIM_D[arg]
             
+                elif opt in HELP_FLAGS:
+                    helpRequested = True
+                    print(getHelpMessage(task))
+            
                 # ignore all other flags
                 else:
-                    print(IGNORE_MSG)
+                    print(IGNORE_MSG + opt + " " + arg)
             
             # make sure all required arguments were specified
-            if None in (inFN, outFN, label):
+            if None in (inFN, outFN, label) and not helpRequested:
                 raise ValueError(ERR_MSG_3)
     
     return task,inFN,outFN,label,delim,helpRequested
