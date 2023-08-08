@@ -145,7 +145,7 @@ def __parseArgs() -> tuple[str,str,int,int,bool]:
     ERR_MSG_2 = "invalid output directory"
     ERR_MSG_3 = "invalid number of threads"
     ERR_MSG_4 = "invalid number of threads per download"
-    ERR_MSG_5 = "must specify an input file (-i;--in)"
+    ERR_MSG_5 = "must specify an input file"
     ERR_MSG_6 = "number of threads per download cannot exceed the maximum number of threads"
     
     # helper function to print help message 
@@ -164,7 +164,7 @@ def __parseArgs() -> tuple[str,str,int,int,bool]:
             "optional arguments:\n" + \
             GAP + f'{DIR_FLAGS[0] + SEP + DIR_FLAGS[1]:<30}{"[str] the directory where reads will be saved (default: current wd)":<}' + EOL + \
             GAP + f'{THREADS_FLAGS_1[0] + SEP + THREADS_FLAGS_1[1]:<30}{"[int] the maximum allowed number of threads (default: 1)":<}' + EOL + \
-            GAP + f'{THREADS_FLAGS_2[0] + SEP + THREADS_FLAGS_2[1]:<30}{"[int] the number of threads to use for each download default: 1)":<}' + EOL + \
+            GAP + f'{THREADS_FLAGS_2[0] + SEP + THREADS_FLAGS_2[1]:<30}{"[int] the number of threads to use for each download (default: 1)":<}' + EOL + \
             GAP + f'{HELP_FLAGS[1] + SEP + HELP_FLAGS[1]:<30}{"print this help message":<}' + EOL
         
         print(MSG)
