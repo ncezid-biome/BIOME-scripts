@@ -129,7 +129,7 @@ def __parseArgs() -> tuple[str,list[str],int,int,TextIOWrapper,str,bool]:
         MSG = EOL + "Extracts a region from a genbank file" + EOL + \
              GAP + "Joseph S. Wirth, 2023" + EOL*2 + \
              "usage:" +  EOL + \
-             GAP + "extractRegionFromGenbank.py [-icseofh]" + EOL*2 + \
+             GAP + "python3 extractRegionFromGenbank.py [-icseofh]" + EOL*2 + \
              "required arguments:" + EOL + \
              GAP + f'{INPUT_FLAGS[0] + SEP + INPUT_FLAGS[1]:<16}{"[str] the filename of an input genbank file"}' + EOL +\
              GAP + f'{CONTIG_FLAGS[0] + SEP + CONTIG_FLAGS[1]:<16}{"[str] the name of the contig(s) (comma-separated) within the input file"}' + EOL*2 + \
