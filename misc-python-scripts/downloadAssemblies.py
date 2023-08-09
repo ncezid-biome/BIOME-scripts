@@ -32,7 +32,7 @@ def __parseArgs() -> tuple[str,str,str,bool,bool]:
     LONG_OPTS = (IN_FLAGS[1][2:] + "=",
                  EMAIL_FLAGS[1][2:] + "=",
                  OUT_FLAGS[1][2:] + "=",
-                 RENAME_FLAGS[1][2:] + \
+                 RENAME_FLAGS[1][2:],
                  HELP_FLAGS[1][2:])
     
     # messages
@@ -477,17 +477,26 @@ def __main() -> None:
         # get a list of uids for the assembly database
         accnL = __parseAccessionFile(accnFN)
         
-        for accn in accnL:
-            uidsL = __assemblyIdsFromSearchTerm(accn, 1)
-            
-            # use the uids to get assembly summaries
-            sumL = __getAssemblySummary(uidsL)
+        if rename:
+            for accn in accnL:
+                uidsL = __assemblyIdsFromSearchTerm(accn, 1)
+                
+                # use the uids to get assembly summaries
+                sumL = __getAssemblySummary(uidsL)
 
-            ftp = __getFtpPathFromAssSummary(sumL.pop())
-            gbffFN = __downloadGbff(ftp, outdir)
+                ftp = __getFtpPathFromAssSummary(sumL.pop())
+                gbffFN = __downloadGbff(ftp, outdir)
             
-            if rename:
                 __renameFile(gbffFN, accn)
+        
+        else:
+            search = __makeAssemblySearchString(accnL)
+            uidsL = __assemblyIdsFromSearchTerm(search, len(accnL))
+            sumL = __getAssemblySummary(uidsL)
+            
+            for summary in sumL:
+                ftp = __getFtpPathFromAssSummary(summary)
+                __downloadGbff(ftp, outdir)
 
         # remove unnecessary files
         __cleanup()
