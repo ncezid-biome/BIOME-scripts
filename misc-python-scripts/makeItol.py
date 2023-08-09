@@ -389,7 +389,9 @@ def __getColorBinary(dataD:dict) -> dict:
         dict: key = field; val = hex color
     """
     # get all unique values and an equal number of colors
-    vals = {y for x in dataD.keys() for y in dataD[x].keys()}
+    for key in dataD.keys():
+        vals = list(dataD[key].keys())
+        break
     cols = __pickColors(len(vals))
     
     # key each value with a color
