@@ -2,6 +2,15 @@
 random scripts
 
 ## misc-python-scripts
+### creating and activating a `conda` environment to run these scripts
+First create the `conda` environment:
+
+    conda env create -f BIOME-scripts/misc-python-scripts/environment.yml
+
+Then activate the `conda` environment to ensure that all the dependencies are available:
+
+    conda activate misc-python
+
 ### downloadAssemblies.py
 #### Joseph S. Wirth, 2023
 Downloads assemblies from a text file containing one accession number for NCBI Assembly per line. Can optionally specify an output directory (default: current directory) or have the files be renamed to match the accession numbers in the text file.
