@@ -1,16 +1,17 @@
 # Joseph S. Wirth
 # August 2023
 
-import getopt, glob, multiprocessing, os, subprocess, sys
+import getopt, glob, gzip, multiprocessing, os, subprocess, sys
 from io import TextIOWrapper
 
 
-def __downloadOneRead(srr:str, outdir:str, numThreads:int) -> None:
+def __downloadOneRead(srr:str, outdir:str, compress:bool, numThreads:int) -> None:
     """downloads a read by calling `fasterq-dump`
 
     Args:
         srr (str): the SRR number of the desired read
         outdir (str): the directory where the reads should be downloaded
+        compress (bool): should the reads be compressed after downloading them?
         numThreads (int): the number of threads to use for this call
     """
     # constants
@@ -18,6 +19,7 @@ def __downloadOneRead(srr:str, outdir:str, numThreads:int) -> None:
     CMD_SUFFIX = '--outdir'
     MAX_ATTEMPTS = 3
     EOL = "\n"
+    PATTERN = "*.fastq"
     FAIL_MSG_1 = 'failed to download reads for '
     FAIL_MSG_2 = "    Error message:  "
     
@@ -42,14 +44,54 @@ def __downloadOneRead(srr:str, outdir:str, numThreads:int) -> None:
     if failed:
         sys.stderr.write(FAIL_MSG_1 + srr + EOL)
         sys.stderr.write(FAIL_MSG_2 + str(e) + EOL*2)
+    
+    elif compress:
+        fwdFN,revFN = glob.glob(os.path.join(outdir, srr + PATTERN))
+        
+        if numThreads > 1:
+            pool = multiprocessing.Pool(processes=numThreads)
+            pool.starmap(__gzipper, [fwdFN,revFN])
+            pool.close()
+            pool.join()
+        
+        else:
+            __gzipper(fwdFN)
+            __gzipper(revFN)
 
 
-def __downloadReads(srrL:list, outdir:str, maxThreads:int, threadsPerCall:int) -> None:
+def __gzipper(inFN:str) -> None:
+    # constants
+    GZ_EXT = ".gz"
+    CHUNK = 1024
+    
+    # get the output filename
+    outFN = inFN + GZ_EXT
+    
+    # open the input and output file
+    with gzip.open(outFN, 'wb') as outFH:
+        with open(inFN, 'rb') as inFH:
+            # Read and compress data in chunks
+            while True:
+                # read the chunk
+                chunk = bytearray(inFH.read(CHUNK))
+                
+                # break from the loop if nothing left to read
+                if not chunk:
+                    break
+
+                # write the chunk to file
+                outFH.write(chunk)
+
+    os.remove(inFN)
+
+
+def __downloadReads(srrL:list, outdir:str, compress:bool, maxThreads:int, threadsPerCall:int) -> None:
     """downloads reads in parallel from SRA
 
     Args:
         srrL (list): a list of SRR numbers to download
         outdir (str): the directory where the reads should be saved
+        compress (bool): should the 
         maxThreads (int): the total number of threads that are available
         threadsPerCall (int): the number of threads that should be allocated to each call
     """
@@ -68,7 +110,7 @@ def __downloadReads(srrL:list, outdir:str, maxThreads:int, threadsPerCall:int) -
     for srr in srrL:
         # skip any existing files
         if srr not in existingFiles:
-            argsL.append((srr, outdir, threadsPerCall))
+            argsL.append((srr, outdir, compress, threadsPerCall))
     
     # map the arguments with the available processors
     pool = multiprocessing.Pool(processes=numParallel)
@@ -103,7 +145,7 @@ def _getSrrList(srrFH:TextIOWrapper) -> list[str]:
     return outL
 
 
-def __parseArgs() -> tuple[str,str,int,int,bool]:
+def __parseArgs() -> tuple[str,str,bool,int,int,bool]:
     """parses command line arguments
 
     Raises:
@@ -115,21 +157,24 @@ def __parseArgs() -> tuple[str,str,int,int,bool]:
         ValueError: number of threads per download cannot exceed total number of threads
 
     Returns:
-        tuple[str,str,int,int,bool]: input filename, output directory, max number of threads, threads per call, help requested?
+        tuple[str,str,int,int,bool]: input filename, output directory, gzip reads?, max number of threads, threads per call, help requested?
     """
     # flags
     INPUT_FLAGS = ("-i", "--in")
     DIR_FLAGS = ("-d", "--dir")
+    GZIP_FLAGS = ('-g', '--gzip')
     THREADS_FLAGS_1 = ("-t", "--max_threads")
     THREADS_FLAGS_2 = ("-p", "--threads_per_download")
     HELP_FLAGS = ("-h", "--help")
     SHORT_OPTS = INPUT_FLAGS[0][-1] + ":" + \
                  DIR_FLAGS[0][-1] + ":" + \
+                 GZIP_FLAGS[0][-1] + \
                  THREADS_FLAGS_1[0][-1] + ":" + \
                  THREADS_FLAGS_2[0][-1] + ":" + \
                  HELP_FLAGS[0][-1]
     LONG_OPTS = (INPUT_FLAGS[1][2:] + "=",
                  DIR_FLAGS[1][2:] + "=",
+                 GZIP_FLAGS[1][2:],
                  THREADS_FLAGS_1[1][2:] + "=",
                  THREADS_FLAGS_2[1][2:] + "=",
                  HELP_FLAGS[1][2:])
@@ -155,13 +200,14 @@ def __parseArgs() -> tuple[str,str,int,int,bool]:
         GAP = 4*" "
         EOL = "\n"
         SEP = ", "
-        MSG = "\nDownloads SRA files in parallel" + EOL + \
+        MSG = "\nDownloads paired-end SRA files in parallel" + EOL + \
             GAP + "Joseph S. Wirth, 2023" + EOL*2 + \
             "Usage:" + EOL + \
             GAP + "downloadSRA.py [-idnph]" + EOL*2 + \
             "required arguments:" + EOL + \
             GAP + f'{INPUT_FLAGS[0] + SEP + INPUT_FLAGS[1]:<30}{"[str] a file containing one SRR ID per line":<}' + EOL*2 + \
             "optional arguments:\n" + \
+            GAP + f'{GZIP_FLAGS[0] + SEP + GZIP_FLAGS[1]:<30}{"gzip the downloaded reads":<}' + EOL + \
             GAP + f'{DIR_FLAGS[0] + SEP + DIR_FLAGS[1]:<30}{"[str] the directory where reads will be saved (default: current wd)":<}' + EOL + \
             GAP + f'{THREADS_FLAGS_1[0] + SEP + THREADS_FLAGS_1[1]:<30}{"[int] the maximum allowed number of threads (default: 1)":<}' + EOL + \
             GAP + f'{THREADS_FLAGS_2[0] + SEP + THREADS_FLAGS_2[1]:<30}{"[int] the number of threads to use for each download (default: 1)":<}' + EOL + \
@@ -172,6 +218,7 @@ def __parseArgs() -> tuple[str,str,int,int,bool]:
     # set default values
     inFN = None
     outDir = DEFAULT_DIR
+    compress = False
     numThreads = DEFAULT_PARALLEL_CALLS
     threadsPerCall = DEFAULT_THREADS_PER_CALL
     
@@ -203,6 +250,10 @@ def __parseArgs() -> tuple[str,str,int,int,bool]:
                     raise NotADirectoryError(ERR_MSG_2)
                 outDir = os.path.abspath(arg)
             
+            # determine if the file should be gzipped
+            elif opt in GZIP_FLAGS:
+                compress = True
+            
             # get the total number of threads
             elif opt in THREADS_FLAGS_1:
                 try:
@@ -229,7 +280,7 @@ def __parseArgs() -> tuple[str,str,int,int,bool]:
         if threadsPerCall > numThreads:
             raise ValueError(ERR_MSG_6)
     
-    return inFN,outDir,numThreads,threadsPerCall,helpRequested
+    return inFN,outDir,compress,numThreads,threadsPerCall,helpRequested
     
 
 def __main() -> None:
@@ -239,7 +290,7 @@ def __main() -> None:
         * downloads the reads for each SRR ID in parallel
     """
     # parse the arguments
-    inFN,outDir,numThreads,threadsPerCall,helpRequested = __parseArgs()
+    inFN,outDir,compress,numThreads,threadsPerCall,helpRequested = __parseArgs()
     
     # no work to do if help requested
     if not helpRequested:
@@ -248,7 +299,7 @@ def __main() -> None:
             srrL = _getSrrList(fh)
         
         # download the reads in parallel
-        __downloadReads(srrL, outDir, numThreads, threadsPerCall)
+        __downloadReads(srrL, outDir, compress, numThreads, threadsPerCall)
 
 
 if __name__ == "__main__":
