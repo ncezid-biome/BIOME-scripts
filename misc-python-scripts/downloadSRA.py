@@ -47,16 +47,8 @@ def __downloadOneRead(srr:str, outdir:str, compress:bool, numThreads:int) -> Non
     
     elif compress:
         fwdFN,revFN = glob.glob(os.path.join(outdir, srr + PATTERN))
-        
-        if numThreads > 1:
-            pool = multiprocessing.Pool(processes=numThreads)
-            pool.starmap(__gzipper, [fwdFN,revFN])
-            pool.close()
-            pool.join()
-        
-        else:
-            __gzipper(fwdFN)
-            __gzipper(revFN)
+        __gzipper(fwdFN)
+        __gzipper(revFN)
 
 
 def __gzipper(inFN:str) -> None:
