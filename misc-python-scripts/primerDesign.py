@@ -1,3 +1,5 @@
+# Joseph S. Wirth, 2023
+
 from __future__ import annotations
 import getopt, multiprocessing, os, sys
 from io import TextIOWrapper
