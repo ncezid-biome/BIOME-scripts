@@ -30,3 +30,7 @@ Converts a genbank file to a nucleotide (fna) fasta for an amino acid (faa) fast
 ### makeItol.py
 #### Joseph S. Wirth, 2023
 Generates text files formatted for annotating trees using the [interactive Tree of Life (iToL)](https://itol.embl.de/). Can generate files for the `color strip` and `binary` data sets. Requires an output filename and a label for the dataset. If making a `color strip`, requires a csv with a header and two columns: column 1 = tip name and column 2 = value. If making a `binary`, requires a csv with a header and two or more columns: column 1 = tip name and subsequent columns = field names; the values for the subsequent columns must be `0` (absent), `1` (present), or `-1` (do not plot). Can optionally specify a delimiter character; by default it is `COMMA`.
+
+### primerDesign.py
+#### Joseph S. Wirth, 2023
+Finds pairs of primers that can be used based with a given input genome independent of a PCR product. First, it extracts all kmers of a given size range that appear only once in the genome, have appropriate GC% and Tm values, do not contain long (>3bp) repeats, do not form hairpins, and have a G or C at the 3' end. Next, it compares primer pairs that can generate a specified PCR product size and saves only those primers who do not form primer dimers and whose GC% differences and Tm differences fall within the specified ranges. Writes the pairs to specified output file along with information about the position and PCR product lengths.
