@@ -19,6 +19,10 @@ Downloads assemblies from a text file containing one accession number for NCBI A
 #### Joseph S. Wirth, 2023
 Downloads reads from NCBI **_in parallel_** using `sratoolkit version 2.11.3`. Takes in a text file with one SRR id per line. Can optionally specify an output directory (default: current directory). To use the parallel feature, specify a maximum number of threads to use (`-t`, `--max_threads`) and the number of threads to use for each parallel process (`-p`, `threads_per_download`). An example for using this program with `qsub` can be found in the `qsub_arrays` folder
 
+### extractLocusTagsFromGenbank.py
+#### Joseph S. Wirth, 2023
+Extracts a locus tag(s) from a genbank file and writes a new fasta file to stdout. Must provide a genbank file and one or more locus tags. If specifying multiple locus tags, then provide them as a comma-separated list. Can optionally specify an output file as the destination. Can optionally specify a molecule type (default: nucleotide) for the output file.
+
 ### extractRegionFromGenbank.py
 #### Joseph S. Wirth, 2023
 Extracts a region(s) from a genbank file and writes a new file to stdout. Must input a genbank file and one or more contigs. If specifying multiple contigs, then provide them as a comma-separated list. Can optionally specify an output file as the destination. Can optionally specify start and/or end coordinates for a contig; this only works when extracting a single contig. Can optionally generate a file in fasta format instead of genbank format.
