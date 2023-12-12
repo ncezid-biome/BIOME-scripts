@@ -44,7 +44,9 @@ def __extractTags(tags:list[str], gbkFn:str, mol:str) -> list[SeqRecord]:
                         try:
                             newRec = SeqRecord(Seq(feat.qualifiers['translation'][0]))
                         except:
-                            newRec = SeqRecord(feat.translate(rec))
+                            newRec = feat.translate(rec)
+                            if type(newRec) == Seq:
+                                newRec = SeqRecord(newRec)
                 
                     # update the record data and save it
                     newRec.id = feat.qualifiers[TAG][0]
