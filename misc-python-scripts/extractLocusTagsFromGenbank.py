@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 __author__ = "Joseph S. Wirth"
 
 import getopt,os,sys
@@ -26,6 +27,7 @@ def __extractTags(tags:list[str], gbkFn:str, mol:str) -> list[SeqRecord]:
     
     # initialize variables
     out = list()
+    found = set()
     rec:SeqRecord
     feat:SeqFeature
     
@@ -34,7 +36,7 @@ def __extractTags(tags:list[str], gbkFn:str, mol:str) -> list[SeqRecord]:
         for feat in rec.features:
             # check if the locus tag was requested
             if TAG in feat.qualifiers.keys():
-                if feat.qualifiers[TAG][0] in tags:
+                if feat.qualifiers[TAG][0] in tags and feat.qualifiers[TAG][0] not in found:
                     # get either the nucleotide or amino acid sequence
                     if mol == NUCL:
                         newRec = feat.extract(rec)
@@ -48,6 +50,7 @@ def __extractTags(tags:list[str], gbkFn:str, mol:str) -> list[SeqRecord]:
                     newRec.id = feat.qualifiers[TAG][0]
                     newRec.name = ''
                     newRec.description = ''
+                    found.add(feat.qualifiers[TAG][0])
                     out.append(newRec)
     
     return out
