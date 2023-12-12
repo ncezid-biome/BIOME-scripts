@@ -75,11 +75,11 @@ def __parseArgs() -> tuple[str,list[str],str,TextIOWrapper,bool]:
                  MOL_FLAGS[0][-1] + ":" + \
                  OUT_FLAGS[0][-1] + ":" + \
                  HELP_FLAGS[0][-1]
-    LONG_OPTS = (GBK_FLAGS[1][:2] + "=",
-                 TAG_FLAGS[1][:2] + "=",
-                 MOL_FLAGS[1][:2] + "=",
-                 OUT_FLAGS[1][:2] + "=",
-                 HELP_FLAGS[1][:2])
+    LONG_OPTS = (GBK_FLAGS[1][2:] + "=",
+                 TAG_FLAGS[1][2:] + "=",
+                 MOL_FLAGS[1][2:] + "=",
+                 OUT_FLAGS[1][2:] + "=",
+                 HELP_FLAGS[1][2:])
     
     # constants
     SEP = ","
