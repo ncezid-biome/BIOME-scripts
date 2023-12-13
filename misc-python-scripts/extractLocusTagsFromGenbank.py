@@ -89,7 +89,6 @@ def __parseArgs() -> tuple[str,list[str],str,TextIOWrapper,bool]:
     # constants
     SEP = ","
     ALLOWED_MOL = ("nucl", "prot")
-    ALLOWED_FMT = ("fasta", "genbank")
     
     # messages
     ERR_MSG_1 = "input file not found"
