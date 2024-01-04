@@ -74,6 +74,38 @@ class Primer:
         
         return new
 
+    def getMinimizer(self, lmerSize:int) -> Seq:
+        """finds the minimizer for the calling object
+
+        Args:
+            lmerSize (int): the length of the l-mer
+
+        Raises:
+            ValueError: primer length must exceed l-mer length
+
+        Returns:
+            Seq: the minimizer sequence
+        """
+        # constants
+        ERR_MSG = "Window size should be less than or equal to the k-mer length."
+        
+        # make sure the lmer is smaller than the primer
+        if len(self.seq) < lmerSize:
+            raise ValueError(ERR_MSG)
+
+        # Initialize the minimizer and its position
+        minimizer = self.seq[:lmerSize]
+
+        # Iterate through the k-mer with the sliding window
+        for i in range(1, len(self.seq) - lmerSize + 1):
+            current_window = self.seq[i:i + lmerSize]
+
+            # Update the minimizer if the current window is lexicographically smaller
+            if current_window < minimizer:
+                minimizer = current_window
+
+        return minimizer
+
 
 def __kmpSearch(text:str, pattern:str) -> bool:
     """implementation of the KMP string search algorithm: O(n+m)
