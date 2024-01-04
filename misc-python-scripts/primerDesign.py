@@ -69,6 +69,11 @@ class Primer:
     
     # public methods
     def reverseComplement(self) -> Primer:
+        """reverse complements the calling object
+
+        Returns:
+            Primer: the reverse complement of the calling object
+        """
         new = Primer(self.seq.reverse_complement(), self.contig, self.end, len(self))
         new.end = self.start
         
