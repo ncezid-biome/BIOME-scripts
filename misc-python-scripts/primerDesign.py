@@ -314,7 +314,7 @@ def __evaluatePrimersAtOnePosition(contig:str, start:int, posL:list[tuple[Seq,in
         idx += 1
 
 
-def __getAllCandidatePrimers(inFN:str, frmt:str, minLen:int, maxLen:int, minGc:float, maxGc:float, minTm:float, maxTm:float, numThreads:int) -> dict[str:list[Primer]]:
+def __getAllCandidatePrimers(inFN:str, frmt:str, minLen:int, maxLen:int, minGc:float, maxGc:float, minTm:float, maxTm:float, numThreads:int) -> dict[str,list[Primer]]:
     """retrieves a list of all viable primer kmers from an input genome
 
     Args:
@@ -329,7 +329,7 @@ def __getAllCandidatePrimers(inFN:str, frmt:str, minLen:int, maxLen:int, minGc:f
         numThreads (int): the number of threads to use for parallel processing
 
     Returns:
-        dict[str:list[Primer]]: key = contig name; val = list of primers sorted by start position
+        dict[str,list[Primer]]: key = contig name; val = list of primers sorted by start position
     """
     # messages
     MSG_1 = 'finding all unique kmers'
