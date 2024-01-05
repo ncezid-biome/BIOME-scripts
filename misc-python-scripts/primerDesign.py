@@ -1,14 +1,15 @@
-# Joseph S. Wirth, 2023
+#!/usr/bin/env python3
 
 from __future__ import annotations
 import getopt, multiprocessing, os, sys
-from io import TextIOWrapper
-from multiprocessing.managers import ListProxy, DictProxy
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqUtils import MeltingTemp
+from multiprocessing.managers import ListProxy
 
+__author__ = "Joseph S. Wirth"
+__version__ = "0.0.1"
 
 class Primer:
     def __init__(self, seq:Seq, contig:str, start:int, length:int) -> Primer:
@@ -396,18 +397,113 @@ def __getAllCandidatePrimers(inFN:str, frmt:str, minLen:int, maxLen:int, minGc:f
     return outD
 
 
-def __evaluateOnePair(p1:Primer, p2:Primer, length:int, queue) -> None:
-    """evaluates if a pair of primers is suitable using an alignment-based method
-       designed to run in parallel
+def __binOverlappingPrimers(candidates:dict[str,list[Primer]]) -> dict[str, dict[int, list[Primer]]]:
+    # initialize output
+    bins = dict()
+    
+    # for each contig in the dictionary
+    for contig in candidates:
+        currentBin = 0
+        prevEnd = None
+        bins[contig] = dict()
+        
+        # for each candidate primer in the contig
+        for cand in candidates[contig]:
+            # the first candidate needs to go into its own bin
+            if prevEnd is None:
+                bins[contig][currentBin] = [cand]
+                prevEnd = cand.end
+            
+            # if the candidate overlaps the previous one, then add it to the bin
+            elif cand.start < prevEnd:
+                prevEnd = cand.end
+                bins[contig][currentBin].append(cand)
+            
+            # otherwise the candidate belongs in a new bin
+            else:
+                prevEnd = cand.end
+                currentBin += 1
+                bins[contig][currentBin] = [cand]
+    
+    return bins
+
+
+def __minimizeOverlaps(bins:dict[str, dict[int,list[Primer]]], minimizerSize:int) -> None:
+    def overlapIsTooLong(primers:list[Primer]) -> bool:
+        MAX_LEN = 64 
+        length = primers[-1].end - primers[0].start
+        return length > MAX_LEN
+    
+    # for each bin number
+    for contig in bins:
+        curBin = max(bins[contig].keys()) + 1
+        for binNum in list(bins[contig].keys()):
+            if overlapIsTooLong(bins[contig][binNum]):
+                
+                primers = bins[contig].pop(binNum)
+                
+                # for each primer; cluster them by minimizer sequence
+                clusters = dict()
+                for primer in primers:
+                    minimizer = primer.getMinimizer(minimizerSize)
+                    
+                    clusters[minimizer] = clusters.get(minimizer, list())
+                    clusters[minimizer].append(primer)
+                
+                # add each cluster as a new bin in the input dictionary
+                for clust in clusters.values():
+                    bins[contig][curBin] = clust
+                    curBin += 1
+
+
+def __binCandidatePrimers(candidates:dict[str,list[Primer]], minPrimerSize:int) -> dict[str, dict[int, list[Primer]]]:
+    # first bin overlapping primers
+    binned = __binOverlappingPrimers(candidates)
+    
+    # next divide the overlapping primers by minimizers (window size 1/2 min primer len)
+    __minimizeOverlaps(binned, int(minPrimerSize / 2))
+    
+    return binned
+
+
+def __evaluateOneBinPair(bin1:list[Primer], bin2:list[Primer], maxTmDiff:float, minProdLen:int, maxProdLen:int, queue):
+    """evaluates a pair of bins of primers to find a single suitable pair
+    designed to run in parallel
 
     Args:
-        p1 (Primer): forward primer
-        p2 (Primer): reverse primer
-        length (int): PCR product length
-        queue: a multiprocessing.Manager().Queue() object to store results for writing
+        bin1 (list[Primer]): the first (upstream) bin of primers
+        bin2 (list[Primer]): the second (downstream) bin of primers
+        maxTmDiff (float): the maximum difference in melting temps
+        minProdLen (int): the minimum PCR product length
+        maxProdLen (int): the maximum PCR product length
+        queue (_type_): a multiprocessing.Manager().Queue() object to store results for writing
+
+    Returns:
+        _type_: _description_
     """
-    # define a helper function to evaluate primer homology
-    def noPrimerDimer() -> bool:
+    # constants
+    FWD = 'forward'
+    REV = 'reverse'
+    
+    # helper functions for evaluating primers
+    def isThreePrimeGc(primer:Primer, direction:str=FWD) -> bool:
+        """checks if a primer has a G or C at its 3' end
+        """
+        # constant
+        GC = {"G", "C"}
+        
+        # different check depending if forward or reverse primer
+        if direction == FWD:
+            return primer.seq[-1] in GC
+        if direction == REV:
+            return primer.seq[0] in GC
+    
+    def isTmDiffWithinRange(p1:Primer, p2:Primer) -> bool:
+        """ checks if the difference between melting temps is within the specified range
+        """
+        return abs(p1.Tm - p2.Tm) <= maxTmDiff
+
+    def noPrimerDimer(p1:Primer, p2:Primer) -> bool:
         """verifies that the primer pair will not form primer dimers
         """
         # constant
@@ -434,9 +530,24 @@ def __evaluateOnePair(p1:Primer, p2:Primer, length:int, queue) -> None:
         
         return True
     
-    # the primer pair is good if it doesn't form dimers
-    if noPrimerDimer():
-        queue.put((p1,p2.reverseComplement(),length))
+    # for each primer in the first bin
+    for p1 in bin1:
+        # only proceed if three prime end is GC
+        if isThreePrimeGc(p1):
+            # for each primer in the second bin
+            for p2 in bin2:
+                # only proceed if the product length is within allowable limits
+                productLen = p2.end - p1.start
+                if minProdLen <= productLen <= maxProdLen:
+                    # only proceed if the reverse primer's end is GC
+                    if isThreePrimeGc(p2, REV):
+                        # only proceed if the Tm difference is allowable
+                        if isTmDiffWithinRange(p1, p2):
+                            # only proceed if primer dimers won't form
+                            if noPrimerDimer(p1, p2):
+                                # write the suitable pair; stop comparing other primers in these bins
+                                queue.put((p1,p2.reverseComplement(),productLen))
+                                return
 
 
 def __writePairsToFile(fn:str, terminator:str, queue) -> None:
@@ -451,12 +562,11 @@ def __writePairsToFile(fn:str, terminator:str, queue) -> None:
     SEP = '\t'
     EOL = '\n'
     NUM_DEC = 1
-    HEADER = 'contig' + SEP + 'fwd_seq' + SEP + 'fwd_Tm' + SEP + 'fwd_GC' + SEP + \
-             'rev_seq' + SEP +'rev_Tm' + SEP + 'rev_GC' + SEP + 'product_len' + EOL
+    HEADER = ['contig', 'fwd_seq', 'fwd_Tm', 'fwd_GC', 'rev_seq', 'rev_Tm', 'rev_GC', 'product_len']
     
     with open(fn, 'w') as fh:
         # write the header
-        fh.write(HEADER)
+        fh.write(SEP.join(HEADER) + EOL)
         
         # keep checking the queue
         while True:
@@ -474,57 +584,39 @@ def __writePairsToFile(fn:str, terminator:str, queue) -> None:
             p1,p2,length = queue.get()
             
             # write the row to file
-            fh.write(p1.contig + SEP)
-            fh.write(str(p1.seq) + SEP)
-            fh.write(str(round(p1.Tm, NUM_DEC)) + SEP)
-            fh.write(str(round(p1.gcPer, NUM_DEC)) + SEP)
-            fh.write(str(p2.seq) + SEP)
-            fh.write(str(round(p2.Tm, NUM_DEC)) + SEP)
-            fh.write(str(round(p2.gcPer, NUM_DEC)) + SEP)
-            fh.write(str(length) + EOL)
+            row = [p1.contig,
+                   str(p1.seq),
+                   str(round(p1.Tm, NUM_DEC)),
+                   str(round(p1.gcPer, NUM_DEC)),
+                   str(p2.seq),
+                   str(round(p2.Tm, NUM_DEC)),
+                   str(round(p2.gcPer, NUM_DEC)),
+                   str(length)]
+            fh.write(SEP.join(row) + EOL)
             fh.flush()
 
 
-def __getPrimerPairs(primersD:dict, minLen:int, maxLen:int, maxTmDiff:float, outFN:str, numThreads:int) -> None:
-    """picks primer pairs from a collection of candidate primers and write them to file
+def __getPrimerPairs(primersD:dict[str, dict[int, list[Primer]]], minPrimerLen:int, minProdLen:int, maxProdLen:int, maxTmDiff:float, outFN:str, numThreads:int) -> None:
+    """picks primer pairs from a collection of binned candidate primers and write them to file
 
     Args:
-        primersD (dict): the dictionary produced by __getAllCandidatePrimers
-        minLen (int): min PCR product length
-        maxLen (int): max PCR product length
+        primersD (dict): the dictionary produced by __binCandidatePrimers
+        minPrimerLen (int): minimum primer length
+        minProdLen (int): min PCR product length
+        maxProdLen (int): max PCR product length
         maxTmDiff (float): maximum difference in melting temps between primers
         outFN (str): filename to write the results
         numThreads (int): number of threads for parallel processing
     """
     # constants
-    FWD = 'forward'
-    REV = 'reverse'
     TERMINATOR = 'END'
     
     # messages
-    MSG_1 = "evaluating 3' ends and primer pair Tm differences"
-    MSG_2 = "screening primer pairs for dimer formation in parallel"
+    MSG_1 = "choosing pairs of primer clusters to compare"
+    MSG_2 = "evaluating pairs of primer clusters in parallel"
     END = ' ... '
     DONE = 'done.'
     
-    # helper functions for evaluating primers
-    def isThreePrimeGc(primer:Primer, direction:str=FWD) -> bool:
-        """checks if a primer has a G or C at its 3' end
-        """
-        # constant
-        GC = {"G", "C"}
-        
-        # different check depending if forward or reverse primer
-        if direction == FWD:
-            return primer.seq[-1] in GC
-        if direction == REV:
-            return primer.seq[0] in GC
-    
-    def isTmDiffWithinRange(p1:Primer, p2:Primer) -> bool:
-        """ checks if the difference between melting temps is within the specified range
-        """
-        return abs(p1.Tm - p2.Tm) <= maxTmDiff
-
     # make a queue so results can be written to the file in parallel
     queue = multiprocessing.Manager().Queue()
 
@@ -532,45 +624,54 @@ def __getPrimerPairs(primersD:dict, minLen:int, maxLen:int, maxTmDiff:float, out
     pool = multiprocessing.Pool(processes=numThreads)
     pool.apply_async(__writePairsToFile, (outFN, TERMINATOR, queue))
 
-    # print status
-    print(MSG_1, end=END, flush=True)
-
-    # initialize a list of arguments for __evaluateOnePair
+    # initialize a list of arguments for __evaluateOneBinPair
     argsL = list()
     
+    # print status
+    print(MSG_1, end=END, flush=True)
+    
+    # build a list of arguments to process in parallel
     # process each contig separately
     for contig in primersD.keys():
-        # extract the list of primers for this contig
-        primersL:list[Primer] = primersD[contig]
+        # a list of the bin numbers for this contig
+        bins = list(primersD[contig].keys())
         
-        # get all pairwise combinations of primers
-        for idx in range(len(primersL)-1):
-            primer1 = primersL[idx]
+        # get the first primer bin
+        for idx in range(len(bins)-1):
+            bin1 = primersD[contig][bins[idx]]
             
-            # forward primer must have GC at 3' end
-            if isThreePrimeGc(primer1): 
-                for primer2 in primersL[idx+1:]:
-                    # product length must be within the specified range
-                    productLen = primer2.end - primer1.start
-                    if minLen <= productLen <= maxLen:
-                        # reverse primer must have GC at 3' end
-                        if isThreePrimeGc(primer2, REV):
-                            # tm diff must be acceptable
-                            if isTmDiffWithinRange(primer1, primer2):
-                                argsL.append((primer1, primer2, productLen, queue))
-                        
-                    # move on to next primer1 once length is too long
-                    elif productLen > maxLen:
-                        break
+            # get the second primer bin
+            for jdx in range(idx+1,len(bins)):
+                bin2 = primersD[contig][bins[jdx]]
+                
+                # calculate the smallest possible product length
+                # smallest primer at beginning of b2 minus smallest primer at end of b1
+                smallest = (bin2[0].start + minPrimerLen) - (bin1[-1].end - minPrimerLen)
+                
+                # calculate the largest posisble product length
+                # difference between the two extremes
+                largest = bin2[-1].end - bin1[0].start
+                
+                # done with all subsequent bins if smallest possible product is too large
+                if smallest > maxProdLen:
+                    break
+                
+                # move to next bin2 if largest possible product is too small
+                elif largest < minProdLen:
+                    continue
+                
+                # otherwise, these two bins could produce viable PCR product lengths; compare them
+                else:
+                    argsL.append((bin1, bin2, maxTmDiff, minProdLen, maxProdLen, queue))
 
     # print status
     print(DONE)
     print(MSG_2, end=END, flush=True)
 
-    # evaluate candidate pairs and write them in parallel
-    pool.starmap(__evaluateOnePair, argsL)
+    # evaluate pairs of binned primers and write them in parallel
+    pool.starmap(__evaluateOneBinPair, argsL)
     
-    # stop the writer then close the pool
+    # stop the writer and close the pool
     queue.put(TERMINATOR)
     pool.close()
     pool.join()
@@ -678,7 +779,7 @@ def __parseArgs() -> tuple[str,str,str,int,int,float,float,float,float,int,int,f
         HELP_MSG = EOL + "Finds pairs of primers suitable for an input genome." + EOL + \
                    GAP + "Joseph S. Wirth, 2023" + EOL*2 + \
                    "usage:" + EOL + \
-                   GAP + "python3 primerDesign.py [-iofpgtnrdh]" + EOL*2 + \
+                   GAP + "primerDesign.py [-iofpgtnrdh]" + EOL*2 + \
                    "required arguments:" + EOL + \
                    GAP + f"{IN_FLAGS[0] + SEP_1 + IN_FLAGS[1]:<22}{'[file] input filename'}" + EOL + \
                    GAP + f"{OUT_FLAGS[0] + SEP_1 + OUT_FLAGS[1]:<22}{'[file] output filename'}" + EOL*2 + \
@@ -839,8 +940,9 @@ def __main():
     """main runner function
         * parses command line arguments
         * retrieves all the candidate primers
+        * bins the candidate primers to reduce unnecessary comparisons
         * finds suitable primer pairs
-        * writes results to file
+        * writes suitable primer pairs to file
     """
     # parse command line arguments
     inFN,outFN,frmt,minPrimerLen,maxPrimerLen,minGc,maxGc,minTm,maxTm,minPcrLen,maxPcrLen,maxTmDiff,numThreads,helpRequested = __parseArgs()
@@ -857,9 +959,14 @@ def __main():
                                             minTm,
                                             maxTm,
                                             numThreads)
+        
+        # bin the primers by overlap and (sometimes) maximizer sequences
+        # maximizer window size is 1/2 the minimum primer length
+        binned = __binCandidatePrimers(candidatesD, int(minPrimerLen/2))
 
-        # evaluate primer pairs and write them to file in parallel
-        __getPrimerPairs(candidatesD,
+        # evaluate binned primer pairs and write suitable primer pairs to file in parallel
+        __getPrimerPairs(binned,
+                         minPrimerLen,
                          minPcrLen,
                          maxPcrLen,
                          maxTmDiff,
