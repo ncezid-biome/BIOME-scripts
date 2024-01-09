@@ -9,7 +9,7 @@ from Bio.SeqUtils import MeltingTemp
 from multiprocessing.managers import ListProxy
 
 __author__ = "Joseph S. Wirth"
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 
 class Primer:
     def __init__(self, seq:Seq, contig:str, start:int, length:int) -> Primer:
@@ -562,7 +562,18 @@ def __writePairsToFile(fn:str, terminator:str, queue) -> None:
     SEP = '\t'
     EOL = '\n'
     NUM_DEC = 1
-    HEADER = ['contig', 'fwd_seq', 'fwd_Tm', 'fwd_GC', 'rev_seq', 'rev_Tm', 'rev_GC', 'product_len']
+    HEADER = ['contig',
+              'fwd_seq',
+              'fwd_start',
+              'fwd_end',
+              'fwd_Tm',
+              'fwd_GC',
+              'rev_seq',
+              'rev_start',
+              'rev_end',
+              'rev_Tm',
+              'rev_GC',
+              'product_len']
     
     with open(fn, 'w') as fh:
         # write the header
@@ -586,9 +597,13 @@ def __writePairsToFile(fn:str, terminator:str, queue) -> None:
             # write the row to file
             row = [p1.contig,
                    str(p1.seq),
+                   str(p1.start),
+                   str(p1.end),
                    str(round(p1.Tm, NUM_DEC)),
                    str(round(p1.gcPer, NUM_DEC)),
                    str(p2.seq),
+                   str(p2.start),
+                   str(p2.end),
                    str(round(p2.Tm, NUM_DEC)),
                    str(round(p2.gcPer, NUM_DEC)),
                    str(length)]
