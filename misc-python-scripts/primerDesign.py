@@ -196,7 +196,20 @@ def __kmpSearch(text:str, pattern:str) -> bool:
     return False
 
 
-def __getUniqueKmers(inFN:str, frmt:str, minLen:int, maxLen:int) -> dict:   
+def __getUniqueKmers(inFN:str, frmt:str, minLen:int, maxLen:int) -> dict[Seq, tuple[str,int,int]]:
+    """gets a collection of kmers that are:
+        * not repeated anywhere in the genome
+        * at least one end is a G or C
+
+    Args:
+        inFN (str): the input genome file
+        frmt (str): the format of the genome file
+        minLen (int): the minimum primer length
+        maxLen (int): the maximum primer length
+
+    Returns:
+        dict: key = kmer sequence as a Seq object; val = tuple[contig, start, kmer length]
+    """
     # helper functions to clarify boolean expressions
     def isOneEndGc(seq:Seq) -> bool:
         """ evaluates if one end of a sequence is a GC
@@ -398,6 +411,14 @@ def __getAllCandidatePrimers(inFN:str, frmt:str, minLen:int, maxLen:int, minGc:f
 
 
 def __binOverlappingPrimers(candidates:dict[str,list[Primer]]) -> dict[str, dict[int, list[Primer]]]:
+    """bins primers that overlap to form a contiguous sequence based on positional data
+
+    Args:
+        candidates (dict[str,list[Primer]]): the dictionary produced by __getAllCandidatePrimers
+
+    Returns:
+        dict[str, dict[int, list[Primer]]]: key = contig; val=dict[key = bin number; val = list of overlapping Primer objects]
+    """
     # initialize output
     bins = dict()
     
@@ -429,8 +450,16 @@ def __binOverlappingPrimers(candidates:dict[str,list[Primer]]) -> dict[str, dict
 
 
 def __minimizeOverlaps(bins:dict[str, dict[int,list[Primer]]], minimizerSize:int) -> None:
+    """splits excessively long overlap bins by the minimizer sequences of the binned primers
+    mutates input dictionary, does not return
+
+    Args:
+        bins (dict[str, dict[int,list[Primer]]]): the dictionary produced by __binOverlappingPrimers
+        minimizerSize (int): the length of the minimizer sequence
+    """
     def overlapIsTooLong(primers:list[Primer]) -> bool:
-        MAX_LEN = 64 
+        """determines if the overlap covered in the bin is too long"""
+        MAX_LEN = 64
         length = primers[-1].end - primers[0].start
         return length > MAX_LEN
     
@@ -457,6 +486,15 @@ def __minimizeOverlaps(bins:dict[str, dict[int,list[Primer]]], minimizerSize:int
 
 
 def __binCandidatePrimers(candidates:dict[str,list[Primer]], minPrimerSize:int) -> dict[str, dict[int, list[Primer]]]:
+    """bins candidate primers based on overlapping positions and minimizers if the overlap is too long
+
+    Args:
+        candidates (dict[str,list[Primer]]): the dictionary produced by __getAllCandidatePrimers
+        minPrimerSize (int): the minimum primer length
+
+    Returns:
+        dict[str, dict[int, list[Primer]]]: key = contig; val = dict[key = bin number; val = list of Primer objects]
+    """
     # first bin overlapping primers
     binned = __binOverlappingPrimers(candidates)
     
@@ -466,7 +504,7 @@ def __binCandidatePrimers(candidates:dict[str,list[Primer]], minPrimerSize:int) 
     return binned
 
 
-def __evaluateOneBinPair(bin1:list[Primer], bin2:list[Primer], maxTmDiff:float, minProdLen:int, maxProdLen:int, queue):
+def __evaluateOneBinPair(bin1:list[Primer], bin2:list[Primer], maxTmDiff:float, minProdLen:int, maxProdLen:int, queue) -> None:
     """evaluates a pair of bins of primers to find a single suitable pair
     designed to run in parallel
 
@@ -477,9 +515,6 @@ def __evaluateOneBinPair(bin1:list[Primer], bin2:list[Primer], maxTmDiff:float, 
         minProdLen (int): the minimum PCR product length
         maxProdLen (int): the maximum PCR product length
         queue (_type_): a multiprocessing.Manager().Queue() object to store results for writing
-
-    Returns:
-        _type_: _description_
     """
     # constants
     FWD = 'forward'
