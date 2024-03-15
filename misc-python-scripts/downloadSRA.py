@@ -19,7 +19,6 @@ def __downloadOneRead(srr:str, outdir:str, compress:bool, numThreads:int) -> Non
     CMD_SUFFIX = '--outdir'
     MAX_ATTEMPTS = 3
     EOL = "\n"
-    PATTERN = "*.fastq"
     FAIL_MSG_1 = 'failed to download reads for '
     FAIL_MSG_2 = "    Error message:  "
     
@@ -44,37 +43,6 @@ def __downloadOneRead(srr:str, outdir:str, compress:bool, numThreads:int) -> Non
     if failed:
         sys.stderr.write(FAIL_MSG_1 + srr + EOL)
         sys.stderr.write(FAIL_MSG_2 + str(e) + EOL*2)
-    
-    elif compress:
-        fwdFN,revFN = glob.glob(os.path.join(outdir, srr + PATTERN))
-        __gzipper(fwdFN)
-        __gzipper(revFN)
-
-
-def __gzipper(inFN:str) -> None:
-    # constants
-    GZ_EXT = ".gz"
-    CHUNK = 1024
-    
-    # get the output filename
-    outFN = inFN + GZ_EXT
-    
-    # open the input and output file
-    with gzip.open(outFN, 'wb') as outFH:
-        with open(inFN, 'rb') as inFH:
-            # Read and compress data in chunks
-            while True:
-                # read the chunk
-                chunk = bytearray(inFH.read(CHUNK))
-                
-                # break from the loop if nothing left to read
-                if not chunk:
-                    break
-
-                # write the chunk to file
-                outFH.write(chunk)
-
-    os.remove(inFN)
 
 
 def __downloadReads(srrL:list, outdir:str, compress:bool, maxThreads:int, threadsPerCall:int) -> None:
@@ -111,7 +79,68 @@ def __downloadReads(srrL:list, outdir:str, compress:bool, maxThreads:int, thread
     pool.join()
 
 
-def _getSrrList(srrFH:TextIOWrapper) -> list[str]:
+def __gzipOneRead(inFn:str) -> None:
+    """gzips input file
+
+    Args:
+        inFn (str): input filename
+    """
+    # constants
+    GZ_EXT = ".gz"
+    CHUNK = 1024
+    
+    # get the output filename
+    outFn = inFn + GZ_EXT
+    
+    # open the input and output file
+    with gzip.open(outFn, 'wb') as outFh:
+        with open(inFn, 'rb') as inFh:
+            # Read and compress data in chunks
+            while True:
+                # read the chunk
+                chunk = bytearray(inFh.read(CHUNK))
+                
+                # break from the loop if nothing left to read
+                if not chunk:
+                    break
+
+                # write the chunk to file
+                outFh.write(chunk)
+
+    os.remove(inFn)
+
+
+def __gzipReads(outdir:str, srrL:list[str], numThreads:int) -> None:
+    """gzips all reads
+
+    Args:
+        outdir (str): the directory where the unzipped reads were downloaded
+        srrL (list[str]): a list of srr ids
+        numThreads (int): the number of threads available for parallel processing
+    """
+    # contants
+    EXT_1 = "_1.fastq"
+    EXT_2 = "_2.fastq"
+    
+    # initialize a list of arguments
+    args = list()
+    
+    # build the list of arguments
+    for srr in srrL:
+        # add both the forward and reverse reads to the list
+        fwdFn = os.path.join(outdir, srr + EXT_1)
+        revFn = os.path.join(outdir, srr + EXT_2)
+        args.append(fwdFn)
+        args.append(revFn)
+    
+    # zip files in parallel
+    pool = multiprocessing.Pool(processes=numThreads)
+    pool.map(__gzipOneRead, args)
+    pool.close()
+    pool.join()
+
+
+def _getSrrList(srrFh:TextIOWrapper) -> list[str]:
     """gets a list of SRR numbers to download
 
     Args:
@@ -125,7 +154,7 @@ def _getSrrList(srrFH:TextIOWrapper) -> list[str]:
     
     # add each SRR number (one per line) to the list
     outL = list()
-    for line in srrFH:
+    for line in srrFh:
         # chomp eol characters
         if line[-1] == EOL:
             line = line[:-1]
@@ -291,7 +320,15 @@ def __main() -> None:
             srrL = _getSrrList(fh)
         
         # download the reads in parallel
+        print('downloading reads ... ', end='', flush=True)
         __downloadReads(srrL, outDir, compress, numThreads, threadsPerCall)
+        print('done.')
+        
+        # zip downloaded reads
+        if compress:
+            print('gzipping reads ... ', end='', flush=True)
+            __gzipReads(outDir, srrL, numThreads)
+            print('done.')
 
 
 if __name__ == "__main__":
