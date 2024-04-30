@@ -1,5 +1,5 @@
-# Joseph S. Wirth
-# July 2023
+#!/usr/bin/env python3
+__author__ = "Joseph S. Wirth"
 
 import getopt, os, sys
 from io import TextIOWrapper

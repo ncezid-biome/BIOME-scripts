@@ -1,4 +1,6 @@
-# Joseph S. Wirth, 2023
+#!/usr/bin/env python3
+__author__ = "Joseph S. Wirth"
+
 import getopt, os, rpy2.robjects, sys
 
 # global variables
