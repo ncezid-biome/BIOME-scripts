@@ -1,12 +1,13 @@
-# Joseph S. Wirth
-# May 2023
+#!/usr/bin/env python3
 
 import ftplib, getopt, glob, gzip, os, re, shutil, sys
 from Bio import Entrez
 from Bio.Entrez import Parser
 
+__author__ = "Joseph S. Wirth"
 
-def __parseArgs() -> tuple[str,str,str,bool,bool]:
+
+def __parseArgs() -> tuple[str,str,str,str,bool,bool]:
     """parses command line arguments
 
     Raises:
@@ -16,31 +17,38 @@ def __parseArgs() -> tuple[str,str,str,bool,bool]:
         ValueError: missing one or more required arguments
 
     Returns:
-        tuple[str,str,str,bool]: email, in file, out directory, rename files?, help requested?
+        tuple[str,str,str,str,bool,bool]: email, in file, format, out directory, rename files?, help requested?
     """
     # flags
     IN_FLAGS = ("-i", "--in")
     EMAIL_FLAGS = ("-e", "--email")
+    FORMAT_FLAGS = ("-f", "--format")
     OUT_FLAGS = ("-o", "--out")
     RENAME_FLAGS = ("-r", "--rename")
     HELP_FLAGS = ("-h", "--help")
     SHORT_OPTS = IN_FLAGS[0][-1] + ":" + \
                  EMAIL_FLAGS[0][-1] + ":" + \
+                 FORMAT_FLAGS[0][-1] + ":" + \
                  OUT_FLAGS[0][-1] + ":" + \
                  RENAME_FLAGS[0][-1] + \
                  HELP_FLAGS[0][-1]
     LONG_OPTS = (IN_FLAGS[1][2:] + "=",
                  EMAIL_FLAGS[1][2:] + "=",
+                 FORMAT_FLAGS[1][2:] + "=",
                  OUT_FLAGS[1][2:] + "=",
                  RENAME_FLAGS[1][2:],
                  HELP_FLAGS[1][2:])
     
     # messages
     ERR_MSG_1 = "input file is invalid or missing"
-    ERR_MSG_2 = "specified output is not a directory"
-    ERR_MSG_3 = "specified email address is invalid"
+    ERR_MSG_8 = "specified output is not a directory"
+    ERR_MSG_2 = "specified email address is invalid"
+    ERR_MSG_3 = "invalid file format specified: "
     ERR_MSG_4 = "must specify all required arguments"
     IGNORE_MSG = "ignoring unused argument: "
+    
+    # constant
+    ALLOWED_FORMATS = ("genbank", "fasta")
     
     # helper function to print the help message
     def printHelpMsg() -> None:
@@ -57,6 +65,7 @@ def __parseArgs() -> tuple[str,str,str,bool,bool]:
                    GAP + f'{IN_FLAGS[0] + SEP + IN_FLAGS[1]:<16}{"input file containing accession numbers (one per line)"}' + EOL + \
                    GAP + f'{EMAIL_FLAGS[0] + SEP + EMAIL_FLAGS[1]:<16}{"email address (for communicating with NCBI; not stored)"}' + EOL*2 + \
                    "Optional arguments:" + EOL + \
+                   GAP + f'{FORMAT_FLAGS[0] + SEP + FORMAT_FLAGS[1]:<16}{"file format to download [fasta|genbank] (default: genbank)"}' + EOL + \
                    GAP + f'{OUT_FLAGS[0] + SEP + OUT_FLAGS[1]:<16}{"output directory where files will be downloaded (default: cwd)"}' + EOL + \
                    GAP + f'{RENAME_FLAGS[0] + SEP + RENAME_FLAGS[1]:<16}{"rename downloaded files to match the input file (default: no)"}' + EOL + \
                    GAP + f'{HELP_FLAGS[0] + SEP + HELP_FLAGS[1]:<16}{"print this message"}' + EOL
@@ -64,8 +73,9 @@ def __parseArgs() -> tuple[str,str,str,bool,bool]:
         print(HELP_MSG)
 
     # set default values
-    accnFN = None
+    fn = None
     email = None
+    frmt = ALLOWED_FORMATS[0]
     outdir = os.getcwd()
     rename = False
     helpRequested = False
@@ -83,20 +93,26 @@ def __parseArgs() -> tuple[str,str,str,bool,bool]:
             if opt in IN_FLAGS:
                 if not os.path.isfile(arg):
                     raise ValueError(ERR_MSG_1)
-                accnFN = arg
+                fn = arg
             
             # get the email address
             elif opt in EMAIL_FLAGS:
                 if not __validEmailAddress(arg):
-                    raise ValueError(ERR_MSG_3)
+                    raise ValueError(ERR_MSG_2)
                 email = arg
+            
+            # get the file format
+            elif opt in FORMAT_FLAGS:
+                if not arg in ALLOWED_FORMATS:
+                    raise ValueError(f"{ERR_MSG_3}'{arg}'")
+                frmt = arg
             
             # get the out directory
             elif opt in OUT_FLAGS:
                 if not os.path.exists(arg):
                     os.mkdir(arg)
                 elif not os.path.isdir(arg):
-                    raise ValueError(ERR_MSG_2)
+                    raise ValueError(ERR_MSG_8)
                 outdir = arg
             
             # determine if renaming will occur
@@ -108,13 +124,13 @@ def __parseArgs() -> tuple[str,str,str,bool,bool]:
                 print(IGNORE_MSG + opt + " " + arg)
         
         # must provide an email and an input file    
-        if None in (email,accnFN):
+        if None in (email,fn):
             raise ValueError(ERR_MSG_4)
     
-    return email,accnFN,outdir,rename,helpRequested
+    return email,fn,frmt,outdir,rename,helpRequested
 
 
-def __parseAccessionFile(accnFN:str) -> list[str]:
+def _parseAccessionFile(accnFN:str) -> list[str]:
     """ reads a file and extracts the accession numbers from it
 
     Args:
@@ -162,7 +178,7 @@ def __validEmailAddress(email:str) -> bool:
     return False
 
 
-def __makeAssemblySearchString(accnL:list) -> str:
+def _makeAssemblySearchString(accnL:list) -> str:
     """ constructs a search string for the assembly database
 
     Args:
@@ -185,7 +201,7 @@ def __makeAssemblySearchString(accnL:list) -> str:
     return searchStr
 
 
-def __assemblyIdsFromSearchTerm(searchStr:str, retmax:int) -> Parser.ListElement[str]:
+def _assemblyIdsFromSearchTerm(searchStr:str, retmax:int) -> Parser.ListElement[str]:
     """ retrieves uids from the assembly database for a given search term
 
     Args:
@@ -301,7 +317,7 @@ def __assemblySummaryFromIdList(idList:list) -> Parser.DictionaryElement:
     return result
 
 
-def __getAssemblySummary(assId) -> list[Parser.DictionaryElement]:
+def _getAssemblySummary(assId) -> list[Parser.DictionaryElement]:
     """ retrieves assembly summaries for a list of uids or a single uid
 
     Args:
@@ -321,7 +337,7 @@ def __getAssemblySummary(assId) -> list[Parser.DictionaryElement]:
     return result[RES_F1][RES_F2]
 
 
-def __getFtpPathFromAssSummary(assSummary:Parser.DictionaryElement) -> str:
+def _getFtpPathFromAssSummary(assSummary:Parser.DictionaryElement, frmt:str) -> str:
     """ extracts the FTP path from an assembly's summary
 
     Args:
@@ -332,9 +348,13 @@ def __getFtpPathFromAssSummary(assSummary:Parser.DictionaryElement) -> str:
     """
     # constants
     SLASH = '/'
+    GBK = "genbank"
+    FNA = "fasta"
     FTP_REF_SEQ = 'FtpPath_RefSeq'
     FTP_GENBANK = 'FtpPath_GenBank'
-    FTP_SUFFIX = '_genomic.gbff.gz'
+    FTP_SUFFIX = '_genomic'
+    GBK_SUFFIX = '.gbff.gz'
+    FNA_SUFFIX = '.fna.gz'
     GREP_FIND = r'^.+/([^/]+)/$'
     GREP_REPLACE = r'\1'
 
@@ -352,6 +372,11 @@ def __getFtpPathFromAssSummary(assSummary:Parser.DictionaryElement) -> str:
     # add the file name of the gbff.gz to the path and return
     ftpPath += re.sub(GREP_FIND, GREP_REPLACE, ftpPath)
     ftpPath += FTP_SUFFIX
+    
+    if frmt == GBK:
+        ftpPath += GBK_SUFFIX
+    elif frmt == FNA:
+        ftpPath += FNA_SUFFIX
 
     return ftpPath
 
@@ -403,7 +428,7 @@ def __decompressGZ(gzFileName:str) -> None:
     os.remove(gzFileName)
 
 
-def __downloadGbff(ftpPath:str, gbffDir:str) -> str:
+def _downloadGbff(ftpPath:str, gbffDir:str) -> str:
     """ a wrapper function to download gbff from NCBI using FTP protocol
 
     Args:
@@ -438,7 +463,7 @@ def __downloadGbff(ftpPath:str, gbffDir:str) -> str:
     return gbffFileName
 
 
-def __renameFile(fn:str, base:str) -> None:
+def _renameFile(fn:str, base:str) -> None:
     """renames a file to match the accession number
 
     Args:
@@ -454,7 +479,7 @@ def __renameFile(fn:str, base:str) -> None:
     os.rename(fn, newFN)
 
 
-def __cleanup() -> None:
+def _cleanup() -> None:
     """ removes the unused dtd files from the current working directory
     """
     PATTERN = "*dtd"
@@ -468,38 +493,38 @@ def __main() -> None:
     """ main wrapper function
     """
     # parse the arguments
-    email,accnFN,outdir,rename,helpRequested = __parseArgs()
+    email,fn,frmt,outdir,rename,helpRequested = __parseArgs()
 
     if not helpRequested:
         # set the email address
         Entrez.email = email
 
         # get a list of uids for the assembly database
-        accnL = __parseAccessionFile(accnFN)
+        accessions = _parseAccessionFile(fn)
         
         if rename:
-            for accn in accnL:
-                uidsL = __assemblyIdsFromSearchTerm(accn, 1)
+            for accn in accessions:
+                uids = _assemblyIdsFromSearchTerm(accn, 1)
                 
                 # use the uids to get assembly summaries
-                sumL = __getAssemblySummary(uidsL)
+                summaries = _getAssemblySummary(uids)
 
-                ftp = __getFtpPathFromAssSummary(sumL.pop())
-                gbffFN = __downloadGbff(ftp, outdir)
+                ftp = _getFtpPathFromAssSummary(summaries.pop(), frmt)
+                gbffFN = _downloadGbff(ftp, outdir)
             
-                __renameFile(gbffFN, accn)
+                _renameFile(gbffFN, accn)
         
         else:
-            search = __makeAssemblySearchString(accnL)
-            uidsL = __assemblyIdsFromSearchTerm(search, len(accnL))
-            sumL = __getAssemblySummary(uidsL)
+            search = _makeAssemblySearchString(accessions)
+            uids = _assemblyIdsFromSearchTerm(search, len(accessions))
+            summaries = _getAssemblySummary(uids)
             
-            for summary in sumL:
-                ftp = __getFtpPathFromAssSummary(summary)
-                __downloadGbff(ftp, outdir)
+            for summary in summaries:
+                ftp = _getFtpPathFromAssSummary(summary, frmt)
+                _downloadGbff(ftp, outdir)
 
         # remove unnecessary files
-        __cleanup()
+        _cleanup()
 
 ###############################################################################
 ###############################################################################
