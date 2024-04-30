@@ -502,20 +502,27 @@ def _runner(email:str, accessions:list[str], frmt:str, outdir:str, rename:bool) 
     # set the email address
     Entrez.email = email
     
+    # print status
+    print(f'downloading {frmt}s ... ', flush=True)
+    
     # if renaming the files
     if rename:
         # get the uid for each file
         for accn in accessions:
-            uids = _assemblyIdsFromSearchTerm(accn, 1)
+            try:
+                uids = _assemblyIdsFromSearchTerm(accn, 1)
             
-            # use the uids to get assembly summaries
-            summaries = _getAssemblySummary(uids)
+                # use the uids to get assembly summaries
+                summaries = _getAssemblySummary(uids)
             
-            # download one file and rename it
-            ftp = _getFtpPathFromAssSummary(summaries.pop(), frmt)
-            gbffFN = _downloadGbff(ftp, outdir)
+                # download one file and rename it
+                ftp = _getFtpPathFromAssSummary(summaries.pop(), frmt)
+                gbffFN = _downloadGbff(ftp, outdir)
 
-            _renameFile(gbffFN, accn)
+                _renameFile(gbffFN, accn)
+            
+            except:
+                print(f'{accn} failed')
             
             time.sleep(2)
     
@@ -533,6 +540,8 @@ def _runner(email:str, accessions:list[str], frmt:str, outdir:str, rename:bool) 
 
     # remove unnecessary files
     _cleanup()
+    
+    print('done')
 
 
 def __main() -> None:
