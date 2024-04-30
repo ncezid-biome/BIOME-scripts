@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import getopt, glob, gzip, multiprocessing, os, subprocess, sys
-from io import TextIOWrapper
 
 __author__ = "Joseph S. Wirth"
 
@@ -141,7 +140,7 @@ def __gzipReads(outdir:str, srrL:list[str], numThreads:int) -> None:
     pool.join()
 
 
-def _getSrrList(srrFh:TextIOWrapper) -> list[str]:
+def _getSrrList(fn:str) -> list[str]:
     """gets a list of SRR numbers to download
 
     Args:
@@ -155,14 +154,16 @@ def _getSrrList(srrFh:TextIOWrapper) -> list[str]:
     
     # add each SRR number (one per line) to the list
     outL = list()
-    for line in srrFh:
-        # chomp eol characters
-        if line[-1] == EOL:
-            line = line[:-1]
-        
-        # ignore empty lines
-        if line != '':
-            outL.append(line)
+    
+    with open(fn, 'r') as fh:
+        for line in fh:
+            # chomp eol characters
+            if line[-1] == EOL:
+                line = line[:-1]
+            
+            # ignore empty lines
+            if line != '':
+                outL.append(line)
     
     return outL
 
@@ -305,6 +306,28 @@ def __parseArgs() -> tuple[str,str,bool,int,int,bool]:
     return inFN,outDir,compress,numThreads,threadsPerCall,helpRequested
     
 
+def _runner(srrs:list[str], outDir:str, compress:bool, numThreads:int, threadsPerCall:int) -> None:
+    """runs the program
+
+    Args:
+        srrs (list[str]): a list of SRR ids to download
+        outDir (str): the directory where reads should be downloaded
+        compress (bool): should reads be gzipped?
+        numThreads (int): max number of threads available
+        threadsPerCall (int): the number of threads per each call
+    """
+    # download the reads in parallel
+    print('downloading reads ... ', end='', flush=True)
+    __downloadReads(srrs, outDir, compress, numThreads, threadsPerCall)
+    print('done.')
+    
+    # zip downloaded reads
+    if compress:
+        print('gzipping reads ... ', end='', flush=True)
+        __gzipReads(outDir, srrs, numThreads)
+        print('done.')
+
+
 def __main() -> None:
     """main runner function
         * parses command line arguments
@@ -312,24 +335,15 @@ def __main() -> None:
         * downloads the reads for each SRR ID in parallel
     """
     # parse the arguments
-    inFN,outDir,compress,numThreads,threadsPerCall,helpRequested = __parseArgs()
+    fn,outDir,compress,numThreads,threadsPerCall,helpRequested = __parseArgs()
     
     # no work to do if help requested
     if not helpRequested:
         # get the SRR numbers to be downloaded
-        with open(inFN, 'r') as fh:
-            srrL = _getSrrList(fh)
+        srrL = _getSrrList(fn)
         
-        # download the reads in parallel
-        print('downloading reads ... ', end='', flush=True)
-        __downloadReads(srrL, outDir, compress, numThreads, threadsPerCall)
-        print('done.')
-        
-        # zip downloaded reads
-        if compress:
-            print('gzipping reads ... ', end='', flush=True)
-            __gzipReads(outDir, srrL, numThreads)
-            print('done.')
+        # run the program
+        _runner(srrL, outDir, compress, numThreads, threadsPerCall)
 
 
 if __name__ == "__main__":
