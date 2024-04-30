@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import ftplib, getopt, glob, gzip, os, re, shutil, sys
+import ftplib, getopt, glob, gzip, os, re, shutil, sys, time
 from Bio import Entrez
 from Bio.Entrez import Parser
 
@@ -489,42 +489,65 @@ def _cleanup() -> None:
         os.remove(fn)
 
 
+def _runner(email:str, accessions:list[str], frmt:str, outdir:str, rename:bool) -> None:
+    """downloads assemblies
+
+    Args:
+        email (str): email address
+        accessions (list[str]): a list of accession numbers to download
+        frmt (str): format [fasta|genbank]
+        outdir (str): output directory
+        rename (bool): should the sequence files be renamed to match the input file?
+    """
+    # set the email address
+    Entrez.email = email
+    
+    # if renaming the files
+    if rename:
+        # get the uid for each file
+        for accn in accessions:
+            uids = _assemblyIdsFromSearchTerm(accn, 1)
+            
+            # use the uids to get assembly summaries
+            summaries = _getAssemblySummary(uids)
+            
+            # download one file and rename it
+            ftp = _getFtpPathFromAssSummary(summaries.pop(), frmt)
+            gbffFN = _downloadGbff(ftp, outdir)
+
+            _renameFile(gbffFN, accn)
+            
+            time.sleep(2)
+    
+    # if not renaming files then can process in batch
+    else:
+        # get all the assembly summaries for all accessions
+        search = _makeAssemblySearchString(accessions)
+        uids = _assemblyIdsFromSearchTerm(search, len(accessions))
+        summaries = _getAssemblySummary(uids)
+        
+        # download each file
+        for summary in summaries:
+            ftp = _getFtpPathFromAssSummary(summary, frmt)
+            _downloadGbff(ftp, outdir)
+
+    # remove unnecessary files
+    _cleanup()
+
+
 def __main() -> None:
     """ main wrapper function
     """
     # parse the arguments
     email,fn,frmt,outdir,rename,helpRequested = __parseArgs()
 
+    # run the program if help wasn't requested
     if not helpRequested:
-        # set the email address
-        Entrez.email = email
-
         # get a list of uids for the assembly database
         accessions = _parseAccessionFile(fn)
         
-        if rename:
-            for accn in accessions:
-                uids = _assemblyIdsFromSearchTerm(accn, 1)
-                
-                # use the uids to get assembly summaries
-                summaries = _getAssemblySummary(uids)
-
-                ftp = _getFtpPathFromAssSummary(summaries.pop(), frmt)
-                gbffFN = _downloadGbff(ftp, outdir)
-            
-                _renameFile(gbffFN, accn)
-        
-        else:
-            search = _makeAssemblySearchString(accessions)
-            uids = _assemblyIdsFromSearchTerm(search, len(accessions))
-            summaries = _getAssemblySummary(uids)
-            
-            for summary in summaries:
-                ftp = _getFtpPathFromAssSummary(summary, frmt)
-                _downloadGbff(ftp, outdir)
-
-        # remove unnecessary files
-        _cleanup()
+        # run the rest of the file
+        _runner(email, accessions, frmt, outdir, rename)
 
 ###############################################################################
 ###############################################################################
