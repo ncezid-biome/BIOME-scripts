@@ -1,8 +1,9 @@
-# Joseph S. Wirth
-# August 2023
+#!/usr/bin/env python3
 
 import getopt, glob, gzip, multiprocessing, os, subprocess, sys
 from io import TextIOWrapper
+
+__author__ = "Joseph S. Wirth"
 
 
 def __downloadOneRead(srr:str, outdir:str, compress:bool, numThreads:int) -> None:
