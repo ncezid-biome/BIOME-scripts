@@ -213,14 +213,74 @@ def _assemblyIdsFromSearchTerm(searchStr:str, retmax:int) -> Parser.ListElement[
     """
     # constants
     DATABASE = "assembly"
-
-    # retrieve result from NCBI
-    handle = Entrez.esearch(db=DATABASE, term=searchStr, retmax=retmax)
-    result = Entrez.read(handle)
-    handle.close()
+    MAX_TRIES = 5
+    PAUSE = 1
+    
+    # initialize variables
+    numTries = 0
+    result = None
+    
+    # keep trying until success
+    while result is None and numTries < MAX_TRIES:
+        # retrieve result from NCBI
+        try:
+            handle = Entrez.esearch(db=DATABASE, term=searchStr, retmax=retmax)
+            result = Entrez.read(handle)
+            handle.close()
+        
+        # reset on a failure; increment number of tries
+        except:
+            result = None
+            numTries += 1
+            time.sleep(PAUSE)
+    
+    if result is None:
+        raise RuntimeError(f"failed to retrieve ids from {DATABASE} database for '{searchStr}'")
 
     # return the list of ids that were found
     return result['IdList']
+
+
+def __esummary(uid:str, database:str, validate:bool) -> Parser.DictionaryElement:
+    """performs Entrez esummary queries to NCBI
+
+    Args:
+        uid (str): the uid to search
+        database (str): the database to search
+        validate (bool): indicates if a result should be validated
+
+    Raises:
+        RuntimeError: failure to retrieve a summary
+
+    Returns:
+        Parser.DictionaryElement: the esummary result
+    """
+    # constants
+    MAX_TRIES = 5
+    PAUSE = 1
+    
+    # initialize variables
+    result = None
+    numTries = 0
+    
+    # keep trying until a success
+    while result is None and numTries < MAX_TRIES:
+        # retrieve data from NCBI
+        try:
+            handle = Entrez.esummary(id=uid, db=database)
+            result = Entrez.read(handle, validate=validate)
+            handle.close()
+        
+        # reset on a failure; increment tries
+        except:
+            result = None
+            numTries += 1
+            time.sleep(PAUSE)
+    
+    if result is None:
+        raise RuntimeError(f"failed to retrieve summary from {database} database for '{uid}'")
+    
+    return result
 
 
 def __assemblySummaryFromIdList(idList:list) -> Parser.DictionaryElement:
@@ -289,30 +349,12 @@ def __assemblySummaryFromIdList(idList:list) -> Parser.DictionaryElement:
                 queryL.append(idStr)
 
     # search NCBI with the first query
-    handle = Entrez.esummary(id=queryL[0], db=DATABASE)
-    result = Entrez.read(handle, validate=VALIDATE)
-    handle.close()
+    result = __esummary(queryL[0], DATABASE, VALIDATE)
 
     # if there are multiple queries, then keep querying NCBI until done
     for i in range(1,len(queryL)):
-        query = queryL[i]
-
-        handle = Entrez.esummary(id=query, db=DATABASE)
-        nextResult = Entrez.read(handle, validate=VALIDATE)
-        handle.close()
-
-        # something I don't wuote understand is happening here.
-        # sometimes, Entrez returns a list, other times its a dict
-        # (technically, they are Entrez's stupid format, and not list or dict)
-        # the problem may be database-specific:
-        ### I think taxonomy returns list and assembly returns dict
-        ### it's not worth resolving since the try-except works
-        try:
-            # append the results if they are returned as lists
-            result.extend(nextResult)
-        except:
-            # append the results if they are returned as dicts
-            result[RESULT_K1][RESULT_K2] += nextResult[RESULT_K1][RESULT_K2]
+        nextResult = __esummary(queryL[i], DATABASE, VALIDATE)
+        result[RESULT_K1][RESULT_K2].append(nextResult[RESULT_K1][RESULT_K2])
 
     return result
 
