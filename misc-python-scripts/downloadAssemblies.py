@@ -5,6 +5,7 @@ from Bio import Entrez
 from Bio.Entrez import Parser
 
 __author__ = "Joseph S. Wirth"
+__version__ = "1.0.1"
 
 
 def __parseArgs() -> tuple[str,str,str,str,bool,bool]:
@@ -26,18 +27,21 @@ def __parseArgs() -> tuple[str,str,str,str,bool,bool]:
     OUT_FLAGS = ("-o", "--out")
     RENAME_FLAGS = ("-r", "--rename")
     HELP_FLAGS = ("-h", "--help")
+    VERSION_FLAGS = ("-v", "--version")
     SHORT_OPTS = IN_FLAGS[0][-1] + ":" + \
                  EMAIL_FLAGS[0][-1] + ":" + \
                  FORMAT_FLAGS[0][-1] + ":" + \
                  OUT_FLAGS[0][-1] + ":" + \
                  RENAME_FLAGS[0][-1] + \
-                 HELP_FLAGS[0][-1]
+                 HELP_FLAGS[0][-1] + \
+                 VERSION_FLAGS[0][-1]
     LONG_OPTS = (IN_FLAGS[1][2:] + "=",
                  EMAIL_FLAGS[1][2:] + "=",
                  FORMAT_FLAGS[1][2:] + "=",
                  OUT_FLAGS[1][2:] + "=",
                  RENAME_FLAGS[1][2:],
-                 HELP_FLAGS[1][2:])
+                 HELP_FLAGS[1][2:],
+                 VERSION_FLAGS[1][2:])
     
     # messages
     ERR_MSG_1 = "input file is invalid or missing"
@@ -68,7 +72,8 @@ def __parseArgs() -> tuple[str,str,str,str,bool,bool]:
                    GAP + f'{FORMAT_FLAGS[0] + SEP + FORMAT_FLAGS[1]:<16}{"file format to download [fasta|genbank] (default: genbank)"}' + EOL + \
                    GAP + f'{OUT_FLAGS[0] + SEP + OUT_FLAGS[1]:<16}{"output directory where files will be downloaded (default: cwd)"}' + EOL + \
                    GAP + f'{RENAME_FLAGS[0] + SEP + RENAME_FLAGS[1]:<16}{"rename downloaded files to match the input file (default: no)"}' + EOL + \
-                   GAP + f'{HELP_FLAGS[0] + SEP + HELP_FLAGS[1]:<16}{"print this message"}' + EOL
+                   GAP + f'{HELP_FLAGS[0] + SEP + HELP_FLAGS[1]:<16}{"print this message"}' + EOL + \
+                   GAP + f'{VERSION_FLAGS[0] + SEP + VERSION_FLAGS[1]:<16}{"print the version"}' + EOL
                 
         print(HELP_MSG)
 
@@ -84,6 +89,11 @@ def __parseArgs() -> tuple[str,str,str,str,bool,bool]:
     if HELP_FLAGS[0] in sys.argv or HELP_FLAGS[1] in sys.argv or len(sys.argv) == 1:
         helpRequested = True
         printHelpMsg()
+    
+    # if the version was requested
+    elif VERSION_FLAGS[0] in sys.argv or VERSION_FLAGS[1] in sys.argv:
+        helpRequested = True
+        print(f"\n{os.path.basename(__file__)} v{__version__}\n")
 
     else:
         # parse then command line arguments
