@@ -3,6 +3,7 @@
 import getopt, glob, gzip, multiprocessing, os, subprocess, sys
 
 __author__ = "Joseph S. Wirth"
+__version__ = "1.0.0"
 
 
 def __downloadOneRead(srr:str, outdir:str, compress:bool, numThreads:int) -> None:
