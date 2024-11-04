@@ -3,7 +3,7 @@
 import getopt, glob, gzip, multiprocessing, os, subprocess, sys
 
 __author__ = "Joseph S. Wirth"
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 
 def __downloadOneRead(srr:str, outdir:str, compress:bool, numThreads:int) -> None:
@@ -189,18 +189,21 @@ def __parseArgs() -> tuple[str,str,bool,int,int,bool]:
     GZIP_FLAGS = ('-g', '--gzip')
     THREADS_FLAGS_1 = ("-t", "--max_threads")
     THREADS_FLAGS_2 = ("-p", "--threads_per_download")
+    VERSION_FLAGS = ("-v", "--version")
     HELP_FLAGS = ("-h", "--help")
     SHORT_OPTS = INPUT_FLAGS[0][-1] + ":" + \
                  GZIP_FLAGS[0][-1] + \
                  DIR_FLAGS[0][-1] + ":" + \
                  THREADS_FLAGS_1[0][-1] + ":" + \
                  THREADS_FLAGS_2[0][-1] + ":" + \
+                 VERSION_FLAGS[0][-1] + \
                  HELP_FLAGS[0][-1]
     LONG_OPTS = (INPUT_FLAGS[1][2:] + "=",
                  GZIP_FLAGS[1][2:],
                  DIR_FLAGS[1][2:] + "=",
                  THREADS_FLAGS_1[1][2:] + "=",
                  THREADS_FLAGS_2[1][2:] + "=",
+                 VERSION_FLAGS[1][2:],
                  HELP_FLAGS[1][2:])
     
     # default values
@@ -235,6 +238,7 @@ def __parseArgs() -> tuple[str,str,bool,int,int,bool]:
             GAP + f'{DIR_FLAGS[0] + SEP + DIR_FLAGS[1]:<30}{"[str] the directory where reads will be saved (default: current wd)":<}' + EOL + \
             GAP + f'{THREADS_FLAGS_1[0] + SEP + THREADS_FLAGS_1[1]:<30}{"[int] the maximum allowed number of threads (default: 1)":<}' + EOL + \
             GAP + f'{THREADS_FLAGS_2[0] + SEP + THREADS_FLAGS_2[1]:<30}{"[int] the number of threads to use for each download (default: 1)":<}' + EOL + \
+            GAP + f'{VERSION_FLAGS[0] + SEP +VERSION_FLAGS[1]:<30}{"print the version":<}' + EOL + \
             GAP + f'{HELP_FLAGS[0] + SEP + HELP_FLAGS[1]:<30}{"print this help message":<}' + EOL
         
         print(MSG)
@@ -245,13 +249,19 @@ def __parseArgs() -> tuple[str,str,bool,int,int,bool]:
     compress = False
     numThreads = DEFAULT_PARALLEL_CALLS
     threadsPerCall = DEFAULT_THREADS_PER_CALL
+    helpRequested = False
     
     # determine if help was requested (or no arguments passed)
-    helpRequested = HELP_FLAGS[0] in sys.argv or HELP_FLAGS[1] in sys.argv or len(sys.argv) == 1
-    
-    # print the help message then exit (if help was requested or no arguments)
-    if helpRequested:
+    if HELP_FLAGS[0] in sys.argv or HELP_FLAGS[1] in sys.argv or len(sys.argv) == 1:
+        # print the help message then exit (if help was requested or no arguments)
         helpMessage()
+        helpRequested = True
+    
+    # determine if the version was requested
+    elif VERSION_FLAGS[0] in sys.argv or VERSION_FLAGS[1] in sys.argv:
+        # print the version then exit
+        print(__version__)
+        helpRequested = True
         
     else:
         # extract command line arguments
