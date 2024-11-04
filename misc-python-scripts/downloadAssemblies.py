@@ -5,7 +5,7 @@ from Bio import Entrez
 from Bio.Entrez import Parser
 
 __author__ = "Joseph S. Wirth"
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 
 def __parseArgs() -> tuple[str,str,str,str,bool,bool]:
@@ -200,15 +200,7 @@ def _makeAssemblySearchString(accnL:list) -> str:
     # constants
     OR = " OR "
 
-    # initialize the string then add each accession number to it
-    searchStr = ""
-    for accn in accnL:
-        searchStr += accn +  OR
-    
-    # truncate the trailing OR
-    searchStr = searchStr[:-len(OR)]
-
-    return searchStr
+    return OR.join(accnL)
 
 
 def _assemblyIdsFromSearchTerm(searchStr:str, retmax:int) -> Parser.ListElement[str]:
@@ -381,7 +373,7 @@ def _getAssemblySummary(assId) -> list[Parser.DictionaryElement]:
     # constants
     RES_F1   = 'DocumentSummarySet'
     RES_F2   = 'DocumentSummary'
-
+    
     # query NCBI
     result = __assemblySummaryFromIdList(assId)
 
