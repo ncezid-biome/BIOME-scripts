@@ -3,7 +3,7 @@
 import getopt, glob, gzip, multiprocessing, os, subprocess, sys
 
 __author__ = "Joseph S. Wirth"
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 
 def __downloadOneRead(srr:str, outdir:str, compress:bool, numThreads:int) -> None:
@@ -191,14 +191,14 @@ def __parseArgs() -> tuple[str,str,bool,int,int,bool]:
     THREADS_FLAGS_2 = ("-p", "--threads_per_download")
     HELP_FLAGS = ("-h", "--help")
     SHORT_OPTS = INPUT_FLAGS[0][-1] + ":" + \
-                 DIR_FLAGS[0][-1] + ":" + \
                  GZIP_FLAGS[0][-1] + \
+                 DIR_FLAGS[0][-1] + ":" + \
                  THREADS_FLAGS_1[0][-1] + ":" + \
                  THREADS_FLAGS_2[0][-1] + ":" + \
                  HELP_FLAGS[0][-1]
     LONG_OPTS = (INPUT_FLAGS[1][2:] + "=",
-                 DIR_FLAGS[1][2:] + "=",
                  GZIP_FLAGS[1][2:],
+                 DIR_FLAGS[1][2:] + "=",
                  THREADS_FLAGS_1[1][2:] + "=",
                  THREADS_FLAGS_2[1][2:] + "=",
                  HELP_FLAGS[1][2:])
@@ -227,7 +227,7 @@ def __parseArgs() -> tuple[str,str,bool,int,int,bool]:
         MSG = "\nDownloads paired-end SRA files in parallel" + EOL + \
             GAP + "Joseph S. Wirth, 2023" + EOL*2 + \
             "Usage:" + EOL + \
-            GAP + "downloadSRA.py [-idnph]" + EOL*2 + \
+            GAP + f"downloadSRA.py [-{''.join(SHORT_OPTS.replace(':', ''))}]" + EOL*2 + \
             "required arguments:" + EOL + \
             GAP + f'{INPUT_FLAGS[0] + SEP + INPUT_FLAGS[1]:<30}{"[str] a file containing one SRR ID per line":<}' + EOL*2 + \
             "optional arguments:\n" + \
@@ -235,7 +235,7 @@ def __parseArgs() -> tuple[str,str,bool,int,int,bool]:
             GAP + f'{DIR_FLAGS[0] + SEP + DIR_FLAGS[1]:<30}{"[str] the directory where reads will be saved (default: current wd)":<}' + EOL + \
             GAP + f'{THREADS_FLAGS_1[0] + SEP + THREADS_FLAGS_1[1]:<30}{"[int] the maximum allowed number of threads (default: 1)":<}' + EOL + \
             GAP + f'{THREADS_FLAGS_2[0] + SEP + THREADS_FLAGS_2[1]:<30}{"[int] the number of threads to use for each download (default: 1)":<}' + EOL + \
-            GAP + f'{HELP_FLAGS[1] + SEP + HELP_FLAGS[1]:<30}{"print this help message":<}' + EOL
+            GAP + f'{HELP_FLAGS[0] + SEP + HELP_FLAGS[1]:<30}{"print this help message":<}' + EOL
         
         print(MSG)
     
