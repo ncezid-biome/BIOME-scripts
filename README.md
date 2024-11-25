@@ -11,6 +11,10 @@ Then activate the `conda` environment to ensure that all the dependencies are av
 
     conda activate misc-python
 
+### calculateJaccard.py
+#### Joseph S. Wirth, 2024
+Calculates the Jaccard index for a collection of fasta files. Relies on positional arguments. Outputs a square matrix with `1.0` along the diagonal (self-vs-self comparisons).
+
 ### downloadAssemblies.py
 #### Joseph S. Wirth, 2023
 Downloads assemblies from a text file containing one accession number for NCBI Assembly per line. Can optionally specify an output directory (default: current directory) or have the files be renamed to match the accession numbers in the text file.
