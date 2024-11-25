@@ -16,3 +16,4 @@ dependencies:
   - biopython=1.81
   - pip:
       - rpy2==3.5.10
+      - khmer
