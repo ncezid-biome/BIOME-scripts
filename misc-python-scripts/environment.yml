@@ -1,4 +1,4 @@
-# Joseph S. Wirth, 2023
+# Joseph S. Wirth, 2024
 ## provides a conda environment for running the python scripts found in this folder
 ## commands:
 ##        $ conda env create -f environment.yml
@@ -6,15 +6,15 @@
 
 name: misc-python
 channels:
+  - conda-forge
   - bioconda
   - defaults
-  - conda-forge
 dependencies:
-  - r-base=4.3.1
-  - python=3.11.0
-  - pip=23.0.1
-  - biopython=1.81
+  - biopython >= 1.81
+  - pip >= 24.0
+  - python >= 3.9
+  - r-base >= 4.3
   - sra-tools
   - pip:
-      - rpy2==3.5.10
+      - rpy2
       - khmer
