@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from Bio import SeqIO
+from Bio.Seq import Seq
 from typing import Generator
 from khmer import Countgraph
 from itertools import combinations
@@ -10,7 +11,7 @@ from multiprocessing import Event, Manager, Pool, Process, Queue
 
 # global constants
 __author__ = "Joseph S. Wirth"
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 __JUNCTION_CHAR = "~"
 __PICKLE_DIR = os.path.join(os.curdir, ".pickles")
 __PICKLE_EXT = ".pkl"
@@ -315,8 +316,11 @@ def __getKmers(seq:str, k:int, name:str) -> None:
     # create a countgraph and use it to retrieve a set of kmers
     kh = Countgraph(k, 1e7, 1)
     
-    # save the kmers
-    __pickleKmers(name, {x for x in kh.get_kmers(seq) if not __JUNCTION_CHAR in x})
+    # save the kmers for both strands
+    kmers = {x for x in kh.get_kmers(seq) if not __JUNCTION_CHAR in x}
+    kmers.update({x for x in kh.get_kmers(Seq(seq).reverse_complement()) if not __JUNCTION_CHAR in x})
+
+    __pickleKmers(name, kmers)
 
 
 def __importSequences(files:list[str], k:int, cpus:int) -> list[str]:
